@@ -32,9 +32,13 @@ import {
   executeMixpanelAnalytics,
   executeCorosMetrics,
   executeAppleHealthSummary,
-  executeGoogleDriveSearch
+  executeGoogleDriveSearch,
+  executeRedBusSchedules,
+  executeBusConsignmentDispatch,
+  executeBusStatusNotice
 } from './pluginExecutors';
 import { pluginManager } from './pluginService';
+import { supabaseAgentPerformance } from './supabaseAgentPerformance';
 
 // Initialize Gemini Client
 // We use the recommended 'gemini-3.8-flash' model
@@ -637,10 +641,12 @@ export const tools = [
       },
       {
         name: "vercel_deploy_status",
-        description: "PLUGIN (Vercel): Check deployment health, production domain preview links, build logs, and edge runtime status.",
+        description: "PLUGIN (Vercel): Deploy project to Vercel production (vprod), check deployment health, verify auto-deployment from GitHub thisisabangcolek-web/Abang-Colek, and verify domain abangcolek-os.vercel.app.",
         parameters: {
           type: Type.OBJECT,
-          properties: {},
+          properties: {
+            action: { type: Type.STRING, description: "Action: 'status' to inspect health, or 'deploy' to trigger production deployment" }
+          },
           required: []
         }
       },
@@ -694,6 +700,58 @@ export const tools = [
             query: { type: Type.STRING, description: "Keyword or file name to search" }
           },
           required: []
+        }
+      },
+      {
+        name: "redbus_bus_freight_schedule",
+        description: "PLUGIN (redBus Malaysia): Dapatkan jadual bas ekspres masa nyata dari TBS (Terminal Bersepadu Selatan) atau terminal lain ke seluruh Semenanjung (Kuala Terengganu, Kota Bharu, Penang, Johor, Kuantan, Melaka, Ipoh) lengkap dengan masa berlepas, tiba, platform, kadar kargo (RM30-50), dan pautan rasmi redBus.my.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            originCity: { type: Type.STRING, description: "Bandar atau terminal asal (contoh: 'Kuala Lumpur', 'TBS', 'Johor Bahru')" },
+            destinationCity: { type: Type.STRING, description: "Bandar destinasi ejen (contoh: 'Kuala Terengganu', 'Kota Bharu', 'Penang', 'Kuantan', 'Ipoh')" }
+          },
+          required: []
+        }
+      },
+      {
+        name: "bus_freight_dispatch_create",
+        description: "PLUGIN (Bus Freight): Daftar konsinan penghantaran kargo bas ABANGCOLEK di terminal (contoh: TBS), rekod bayaran DuitNow QR pemandu bas, no plat bas, masa berlepas & sampai, butiran ejen & driver, serta jana notis WhatsApp rasmi ke ejen.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            companyName: { type: Type.STRING, description: "Nama syarikat bas (contoh: Sani Express, Adik Beradik, Perdana Express, KKKL)" },
+            busPlateNo: { type: Type.STRING, description: "Nombor pendaftaran / plat bas (contoh: VDF 8821, DDA 5439)" },
+            driverName: { type: Type.STRING, description: "Nama driver bas" },
+            driverPhone: { type: Type.STRING, description: "Nombor telefon / WhatsApp driver bas" },
+            originTerminal: { type: Type.STRING, description: "Terminal asal serahan stok (contoh: 'Terminal Bersepadu Selatan (TBS), KL')" },
+            destinationTerminal: { type: Type.STRING, description: "Terminal destinasi ambilan ejen" },
+            departureTime: { type: Type.STRING, description: "Masa berlepas (contoh: '09:30 AM')" },
+            estimatedArrivalTime: { type: Type.STRING, description: "Anggaran masa tiba (ETA) (contoh: '03:45 PM')" },
+            agentName: { type: Type.STRING, description: "Nama ejen penerima (contoh: 'Kak Mas (@jeruxsliurlelehterengganu)')" },
+            agentPhone: { type: Type.STRING, description: "Nombor telefon ejen penerima" },
+            agentHub: { type: Type.STRING, description: "Bandar / hub ejen (contoh: 'Kuala Terengganu')" },
+            destinationAddress: { type: Type.STRING, description: "Lokasi platform / kaunter ambilan" },
+            cargoFeeMyr: { type: Type.NUMBER, description: "Upah kargo pemandu dibayar melalui DuitNow QR (contoh: 40)" },
+            packageDescription: { type: Type.STRING, description: "Penerangan bungkusan (contoh: '2 Kotak Tebal 100 Botol Kuah Colek')" },
+            boxCount: { type: Type.NUMBER, description: "Bilangan kotak" },
+            bottleCount: { type: Type.NUMBER, description: "Jumlah botol kuah colek" },
+            notes: { type: Type.STRING, description: "Nota serahan kargo" }
+          },
+          required: ["companyName", "busPlateNo", "driverName", "driverPhone", "agentName", "agentPhone"]
+        }
+      },
+      {
+        name: "bus_freight_update_arrival_notice",
+        description: "PLUGIN (Bus Freight): Kemas kini status SOP 1 jam sebelum sampai (driver hubungi ejen), sahkan tuntutan stok di terminal, atau semak hak ejen berhubung terus dengan pemandu bas.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            consignmentId: { type: Type.STRING, description: "ID konsinan (contoh: 'BFG-2026-081')" },
+            action: { type: Type.STRING, description: "'one_hour_alert' (driver call ejen 1 jam sebelum tiba) | 'agent_contact_driver' (hak komunikasi terus ejen) | 'confirm_collected' (selesai tuntut)" },
+            notes: { type: Type.STRING, description: "Catatan kemas kini lokasi atau status" }
+          },
+          required: ["action"]
         }
       }
     ],
@@ -1366,7 +1424,7 @@ Behavior:
             } else if (call.name === "github_manage_repo") {
               output = await executeGitHubManage(call.args as any);
             } else if (call.name === "vercel_deploy_status") {
-              output = await executeVercelStatus();
+              output = await executeVercelStatus(call.args as any);
             } else if (call.name === "supabase_query_db") {
               output = await executeSupabaseQuery(call.args as any);
             } else if (call.name === "mixpanel_track_analytics") {
@@ -1377,15 +1435,43 @@ Behavior:
               output = await executeAppleHealthSummary();
             } else if (call.name === "google_drive_search_files") {
               output = await executeGoogleDriveSearch(call.args as any);
+            } else if (call.name === "redbus_bus_freight_schedule") {
+              output = await executeRedBusSchedules(call.args as any);
+            } else if (call.name === "bus_freight_dispatch_create") {
+              output = await executeBusConsignmentDispatch(call.args as any);
+            } else if (call.name === "bus_freight_update_arrival_notice") {
+              output = await executeBusStatusNotice(call.args as any);
             }
 
             const toolEndTime = performance.now();
+            const measuredLatency = Math.round(toolEndTime - toolStartTime);
+
+            // Log tool execution telemetry to Supabase Agent Performance
+            try {
+              const category = call.name.includes('bus') ? 'Logistik & Bas' :
+                               call.name.startsWith('create_google') || call.name.startsWith('send_') || call.name.startsWith('schedule_') || call.name.includes('drive') ? 'Google Workspace' :
+                               call.name.includes('yearly') || call.name.includes('dashboard') || call.name.includes('jev') ? 'Analisis & Laporan' : 'Gedung Plugins';
+              
+              supabaseAgentPerformance.recordTaskExecution({
+                task_id: stepId,
+                tool_name: call.name,
+                tool_category: category,
+                latency_ms: measuredLatency,
+                status: output?.success !== false ? 'SUCCESS' : 'ERROR',
+                tokens_used: 350,
+                user_query: finalFullText?.slice(0, 80) || `Pelaksanaan alat ${call.name}`,
+                model: MODEL_NAME,
+                error_message: output?.error
+              }).catch(() => {});
+            } catch {
+              // Non-blocking telemetry
+            }
 
             const stepIndex = steps.findIndex(s => s.id === stepId);
             if (stepIndex > -1) {
               steps[stepIndex].status = 'completed';
               steps[stepIndex].result = output;
-              steps[stepIndex].latencyMs = toolEndTime - toolStartTime;
+              steps[stepIndex].latencyMs = measuredLatency;
             }
             notifyToolExecution(false);
             notify(false, finalFullText);
@@ -1438,7 +1524,10 @@ Behavior:
       s.toolName === "mixpanel_track_analytics" ||
       s.toolName === "coros_health_metrics" ||
       s.toolName === "apple_health_summary" ||
-      s.toolName === "google_drive_search_files"
+      s.toolName === "google_drive_search_files" ||
+      s.toolName === "redbus_bus_freight_schedule" ||
+      s.toolName === "bus_freight_dispatch_create" ||
+      s.toolName === "bus_freight_update_arrival_notice"
     ));
 
     const modelMsg: ChatMessage = {

@@ -22,7 +22,11 @@ import {
   ShieldCheck, 
   Star, 
   Zap,
-  ArrowRight
+  ArrowRight,
+  Truck,
+  Phone,
+  MessageSquare,
+  QrCode
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
@@ -35,7 +39,9 @@ import {
   MixpanelAnalyticsResult, 
   CorosFitnessResult, 
   AppleHealthResult, 
-  DriveSearchResult 
+  DriveSearchResult,
+  BusFreightScheduleResult,
+  BusFreightConsignmentResult
 } from '@/services/pluginExecutors';
 
 interface PluginArtifactCardProps {
@@ -318,7 +324,7 @@ export const PluginArtifactCard: React.FC<PluginArtifactCardProps> = ({ pluginTy
     );
   }
 
-  // 6. Vercel Status
+  // 6. Vercel Status & Deployment (vprod)
   if (pluginType === 'vercel_deploy_status') {
     const v: VercelStatusResult = data;
     return (
@@ -326,23 +332,30 @@ export const PluginArtifactCard: React.FC<PluginArtifactCardProps> = ({ pluginTy
         <div className="flex items-center justify-between pb-2 border-b border-black/5">
           <div className="flex items-center gap-2">
             <Cpu size={16} className="text-black" />
-            <span className="font-bold text-xs text-zinc-900">Vercel Deployment ({v.projectName})</span>
+            <span className="font-bold text-xs text-zinc-900">Vercel Deployment ({v.projectName} · vprod)</span>
           </div>
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            {v.status}
+            {v.status} · LIVE
           </span>
         </div>
-        <div className="p-3 bg-zinc-50 rounded-xl border border-black/5 text-xs flex justify-between items-center">
+        
+        <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+          <span className="truncate">Akaun Vercel: thisidowgnut@gmail.com</span>
+          <span className="text-emerald-700 font-bold shrink-0">Auto-deploy Active</span>
+        </div>
+
+        <div className="p-3 bg-zinc-50 rounded-xl border border-black/5 text-xs flex justify-between items-center gap-3">
           <div>
-            <span className="text-[10px] text-zinc-400 block font-medium">Domain Pengeluaran:</span>
+            <span className="text-[10px] text-zinc-400 block font-medium">Domain Pengeluaran (Production):</span>
             <a href={v.url} target="_blank" rel="noreferrer" className="font-bold text-blue-600 hover:underline flex items-center gap-1">
               <span>{v.url}</span>
               <ExternalLink size={10} />
             </a>
           </div>
-          <div className="text-right text-[11px] text-zinc-500">
-            <span>Masa Bina: {v.buildTime}</span> · <span>{v.region}</span>
+          <div className="text-right text-[11px] text-zinc-500 shrink-0">
+            <span className="block font-semibold text-zinc-700">Masa Bina: {v.buildTime}</span>
+            <span className="text-[10px] text-zinc-400">{v.region}</span>
           </div>
         </div>
       </div>
@@ -520,6 +533,162 @@ export const PluginArtifactCard: React.FC<PluginArtifactCardProps> = ({ pluginTy
               <span className="text-[10px] text-zinc-400 shrink-0">{f.size}</span>
             </a>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 12. redBus Freight Schedules
+  if (pluginType === 'redbus_bus_freight_schedule') {
+    const r: BusFreightScheduleResult = data;
+    return (
+      <div className="my-3 p-5 rounded-2xl bg-white border border-black/10 shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-3 border-b border-black/5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center border border-red-100 font-bold">
+              <Truck size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-xs text-zinc-900">Jadual Bas redBus.my</span>
+                <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                  {r.originCity} → {r.destinationCity}
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-500">Masa nyata TBS & terminal Semenanjung untuk kargo kuah colek</p>
+            </div>
+          </div>
+
+          <a 
+            href="https://www.redbus.my/" 
+            target="_blank" 
+            rel="noreferrer"
+            className="text-[11px] font-semibold text-red-600 hover:text-red-700 flex items-center gap-1"
+          >
+            <span>redBus.my</span>
+            <ExternalLink size={12} />
+          </a>
+        </div>
+
+        <div className="space-y-2">
+          {r.schedules.slice(0, 4).map((s) => (
+            <div key={s.id} className="p-3 rounded-xl bg-zinc-50 border border-black/5 flex items-center justify-between text-xs">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-zinc-900">{s.operator}</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">Platform {s.platformNo || 'TBS'}</span>
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-0.5">
+                  Berlepas: <strong className="text-zinc-800">{s.departureTime}</strong> · Tiba: <strong className="text-emerald-700">{s.arrivalTime}</strong> ({s.durationHours})
+                </p>
+              </div>
+
+              <div className="text-right flex flex-col items-end gap-1">
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  ~RM{s.estimatedFreightRateMyr} Upah
+                </span>
+                <a
+                  href={s.redBusUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-zinc-500 hover:text-zinc-800 underline"
+                >
+                  Tempah Bas
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 13. Bus Consignment Dispatch Card (TBS Handover, DuitNow QR & WhatsApp)
+  if (pluginType === 'bus_freight_dispatch_create') {
+    const d: BusFreightConsignmentResult = data;
+    const c = d.consignment;
+    return (
+      <div className="my-3 p-5 rounded-2xl bg-white border border-red-200 ring-2 ring-red-500/10 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-black/5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold">
+              <Truck size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-zinc-900">{c.companyName}</span>
+                <span className="px-2 py-0.5 rounded bg-zinc-900 text-white font-mono text-xs font-bold">
+                  {c.busPlateNo}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500">ID Konsinan: <strong className="text-zinc-800">{c.id}</strong></p>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+              <CheckCircle2 size={12} className="text-emerald-600" />
+              DuitNow QR RM{c.cargoFeeMyr.toFixed(0)} Selesai
+            </span>
+          </div>
+        </div>
+
+        {/* Timings & Terminals */}
+        <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-zinc-50 border border-black/5 text-xs">
+          <div>
+            <p className="text-[10px] font-bold uppercase text-zinc-400">Terminal Asal</p>
+            <p className="font-semibold text-zinc-800 truncate">{c.originTerminal}</p>
+            <p className="text-zinc-500 text-[11px]">Berlepas: <strong>{c.departureTime}</strong></p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-zinc-400">Terminal Ambilan Ejen</p>
+            <p className="font-semibold text-emerald-800 truncate">{c.destinationTerminal}</p>
+            <p className="text-zinc-500 text-[11px]">Anggaran Tiba: <strong>{c.estimatedArrivalTime}</strong></p>
+          </div>
+        </div>
+
+        {/* Driver & Agent */}
+        <div className="p-3 rounded-xl bg-white border border-black/5 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Driver Bas:</span>
+            <span className="font-bold text-zinc-900">{c.driverName} ({c.driverPhone})</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Ejen Penerima:</span>
+            <span className="font-bold text-zinc-900">{c.agentName} ({c.agentPhone})</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Kargo Kuah Colek:</span>
+            <span className="font-semibold text-zinc-800">{c.boxCount} Kotak ({c.bottleCount} Botol)</span>
+          </div>
+        </div>
+
+        {/* 1-Hour Protocol & Action Buttons */}
+        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px]">
+          <p className="font-bold">⚠️ SOP 1 Jam Sebelum Tiba & Hak Ejen:</p>
+          <p className="mt-0.5">Driver akan menghubungi Ejen 1 jam sebelum sampai. Ejen juga berhak menghubungi driver bas secara terus.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-black/5">
+          <a
+            href={d.agentWhatsAppUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow-xs"
+          >
+            <MessageSquare size={13} />
+            <span>Hantar Butiran ke Ejen</span>
+          </a>
+
+          <a
+            href={d.agentToDriverUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white font-bold text-xs hover:bg-zinc-800 flex items-center gap-1.5"
+          >
+            <Phone size={13} />
+            <span>Ejen Call Driver Bas</span>
+          </a>
         </div>
       </div>
     );

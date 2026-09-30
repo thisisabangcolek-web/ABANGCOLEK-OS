@@ -29,7 +29,9 @@ import {
   Flame,
   Plus,
   AlertCircle,
-  Zap
+  Zap,
+  Truck,
+  Gauge
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
@@ -51,6 +53,9 @@ import { subscribeAuth } from '@/services/googleAuth';
 import { User as FbUser } from 'firebase/auth';
 import { OrdersView } from '@/components/OrdersView';
 import { useSupabaseAuth } from '@/services/supabaseAuth';
+import { BusFreightView } from '@/components/BusFreightView';
+import { AgentPerformanceView } from '@/components/AgentPerformanceView';
+import { AgentInsightCard } from '@/components/AgentInsightCard';
 
 // --- Components ---
 
@@ -75,7 +80,8 @@ const Sidebar = ({
   const workspaceItems = [
     { id: 'discovery', label: 'Abang Colek Hub', icon: Flame, badge: 'v4.2' },
     { id: 'chat', label: 'Agent Chat', icon: Bot },
-    { id: 'plugins', label: 'Gedung Plugins', icon: Zap, badge: '11 Aktif' },
+    { id: 'bus_freight', label: 'Ekspres Bas & Ejen', icon: Truck, badge: 'SOP 1 Jam' },
+    { id: 'plugins', label: 'Gedung Plugins', icon: Zap, badge: '12 Aktif' },
     { id: 'gmail', label: 'Gmail', icon: Mail },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
@@ -88,6 +94,7 @@ const Sidebar = ({
   ];
 
   const analyticsItems = [
+    { id: 'agent_performance', label: 'Prestasi Agen AI', icon: Gauge, badge: 'Recharts' },
     { id: 'dashboards', label: 'Dashboards', icon: Activity },
     { id: 'reports', label: 'Reports', icon: Search },
     { id: 'orders', label: 'Orders', icon: Database },
@@ -1061,7 +1068,13 @@ const ReportsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
   );
 };
 
-const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
+const DashboardsView = ({ 
+  onAction,
+  setActiveTab 
+}: { 
+  onAction: (msg?: string) => void;
+  setActiveTab?: (tab: string) => void;
+}) => {
   const handleGenerateDashboard = () => {
     onAction("Bina dashboard analitik visual operasi Abang Colek merangkumi prestasi jualan hab utama (Johor Bahru, Shah Alam, Terengganu, Bangi), taburan isu botol bocor, dan KPI krew pop-up.");
   };
@@ -1077,6 +1090,14 @@ const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
           <button onClick={handleGenerateDashboard} className="px-5 py-2.5 bg-black text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors cursor-pointer">
             + Bina Dashboard AI
           </button>
+        </div>
+
+        {/* Real-time Agent Insight Card (Supabase Telemetry) */}
+        <div className="mb-6">
+          <AgentInsightCard 
+            onAction={onAction}
+            onViewFullPerformance={() => setActiveTab && setActiveTab('agent_performance')}
+          />
         </div>
 
         <div className="grid gap-6">
@@ -1207,6 +1228,8 @@ const BottomNav = ({
   const menuItems = [
     { id: 'discovery', label: 'Discovery', icon: Flame },
     { id: 'chat', label: 'Chat', icon: Bot },
+    { id: 'agent_performance', label: 'Prestasi', icon: Gauge },
+    { id: 'bus_freight', label: 'Bas & Ejen', icon: Truck },
     { id: 'plugins', label: 'Plugins', icon: Zap },
     { id: 'gmail', label: 'Gmail', icon: Mail },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -1360,6 +1383,8 @@ export default function App() {
               setActiveTab={setActiveTab}
             />
           )}
+          {activeTab === 'bus_freight' && <BusFreightView onAction={handleAction} />}
+          {activeTab === 'agent_performance' && <AgentPerformanceView onAction={handleAction} />}
           {activeTab === 'plugins' && <PluginsView onAction={handleAction} />}
           {activeTab === 'gmail' && <GmailView onAction={handleAction} />}
           {activeTab === 'calendar' && <CalendarView onAction={handleAction} />}
@@ -1373,7 +1398,7 @@ export default function App() {
           {activeTab === 'orders' && <OrdersView onAction={handleAction} />}
           {activeTab === 'reviews' && <ReviewsView onAction={handleAction} />}
           {activeTab === 'reports' && <ReportsView onAction={handleAction} />}
-          {activeTab === 'dashboards' && <DashboardsView onAction={handleAction} />}
+          {activeTab === 'dashboards' && <DashboardsView onAction={handleAction} setActiveTab={setActiveTab} />}
         </div>
         
         <div className="mt-4 px-4 text-[11px] text-zinc-400 text-center md:text-right shrink-0">

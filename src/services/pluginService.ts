@@ -180,28 +180,28 @@ export const INITIAL_PLUGINS: PluginItem[] = [
   },
   {
     id: 'vercel',
-    name: 'Vercel Deployment',
+    name: 'Vercel Deployment (vprod)',
     category: 'dev_coding',
     categoryLabel: 'Pembangunan & Pengekodan',
     developer: 'Vercel Inc.',
-    description: 'Bina, pantau log pelancaran web, periksa domain production, dan semak kesihatan pelayan Edge runtime.',
-    detailedDescription: 'Sambungkan akaun Vercel anda untuk memantau status sistem ABANGCOLEK-OS, menyemak pautan preview cawangan git, dan menjalankan build deployment pantas.',
+    description: 'Auto-deployment dari GitHub ke Vercel production (vprod), pantau status binaan, dan periksa domain production.',
+    detailedDescription: 'Disambungkan dengan akaun Vercel thisidowgnut@gmail.com, token rasmi vprod (vcp_8SbIn7ENW44RwyDQXAQMXLrcnXkaRnf5VYjW8QhzFclSeO1jgf3PJoRT) dan repositori GitHub thisisabangcolek-web/Abang-Colek dengan sokongan CI/CD automatik.',
     installed: true,
     enabled: true,
     requiresAuth: true,
     authType: 'api_key',
-    connectedAccount: 'team_abangcolek (Token Terhubung)',
+    connectedAccount: 'thisidowgnut@gmail.com (vprod · Token Active)',
     iconType: 'Cpu',
     accentColor: '#000000',
-    capabilities: ['Semak status pelancaran (Production / Preview)', 'Pantau ralat log pelayan', 'Picu deploy semula (Instant Redeploy)', 'Analisis kelajuan Web Vitals'],
+    capabilities: ['Auto-deployment dari GitHub ke Vercel (vprod)', 'Semak status pelancaran (Production / Preview)', 'Picu deploy semula (Instant Redeploy)', 'Sahkan pautan domain abangcolek-os.vercel.app'],
     examplePrompts: [
-      'Semak status deployment aplikasi di Vercel sekarang',
-      'Adakah domain production Abang Colek beroperasi tanpa ralat?',
-      'Papar log binaan terkini untuk cawangan production di Vercel'
+      'Deploy projek ini ke Vercel production (vprod) sekarang',
+      'Semak status auto-deployment dari GitHub ke Vercel',
+      'Adakah domain production abangcolek-os.vercel.app beroperasi tanpa ralat?'
     ],
-    version: '2.8.0',
-    rating: 4.8,
-    reviewCount: 2300
+    version: '3.0.0',
+    rating: 4.9,
+    reviewCount: 3100
   },
 
   // 4. Pangkalan Data & Analitik
@@ -306,6 +306,39 @@ export const INITIAL_PLUGINS: PluginItem[] = [
     version: '4.1.0',
     rating: 4.8,
     reviewCount: 4890
+  },
+  {
+    id: 'redbus_freight',
+    name: 'redBus Malaysia & Freight Bas',
+    category: 'travel_booking',
+    categoryLabel: 'Perjalanan & Tempahan',
+    developer: 'redBus Malaysia & ABANGCOLEK Logistics',
+    description: 'Jadual bas ekspres masa nyata dari TBS ke seluruh Semenanjung, pengurusan konsinan kargo, bayaran DuitNow QR driver, dan protokol SOP amaran 1 jam sebelum sampai.',
+    detailedDescription: 'Sistem pengedaran stok kuah colek melalui bas ekspres (Sani Express, Adik Beradik, Perdana, KKKL, E-Mutiara). Menyelaras serahan di terminal (TBS), pembayaran upah DuitNow QR pemandu, pendaftaran masa berlepas & tiba, nombor plat bas & contact driver, notis automatik kepada ejen, serta hak komunikasi terus ejen-driver.',
+    installed: true,
+    enabled: true,
+    requiresAuth: false,
+    authType: 'none',
+    connectedAccount: 'redBus.my Live Schedule & PayNet DuitNow Active',
+    iconType: 'Truck',
+    accentColor: '#D8232A',
+    capabilities: [
+      'Semak jadual bas ekspres masa nyata redBus.my mengikut laluan & terminal',
+      'Daftar serahan kargo di TBS bersama No Plat & No Tel Driver',
+      'Bayaran upah kargo segera melalui DuitNow National QR',
+      'Kemaskini notis WhatsApp rasmi ke Ejen & Pemandu Bas',
+      'SOP panggilan 1 jam sebelum bas sampai ke destinasi',
+      'Pautan komunikasi terus Ejen ↔ Driver Bas untuk semakan lokasi'
+    ],
+    examplePrompts: [
+      'Semak jadual bas ekspres TBS ke Kuala Terengganu di redBus untuk hantar stok kuah colek',
+      'Daftar penghantaran kargo bas Sani Express plat VDF 8821 ke Ejen Kak Mas Terengganu',
+      'Picu notis SOP 1 jam sebelum sampai untuk driver hubungi ejen',
+      'Beri pautan WhatsApp terus ejen untuk berhubung dengan driver bas'
+    ],
+    version: '4.5.0',
+    rating: 5.0,
+    reviewCount: 1840
   },
 
   // 6. Kesihatan & Kecergasan

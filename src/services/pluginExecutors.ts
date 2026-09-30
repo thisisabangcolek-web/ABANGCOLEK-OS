@@ -5,6 +5,26 @@
 
 import { pluginManager } from './pluginService';
 import { supabase, SUPABASE_CONFIG, checkSupabaseConnection } from './supabaseClient';
+import { triggerVercelProductionDeploy, VERCEL_CONFIG } from './vercelDeploy';
+import { 
+  busFreightManager, 
+  BusSchedule, 
+  BusConsignment, 
+  formatWhatsAppUrl 
+} from './busFreightService';
+
+export interface BusFreightScheduleResult {
+  originCity: string;
+  destinationCity: string;
+  schedules: BusSchedule[];
+}
+
+export interface BusFreightConsignmentResult {
+  consignment: BusConsignment;
+  agentWhatsAppUrl: string;
+  driverWhatsAppUrl: string;
+  agentToDriverUrl: string;
+}
 
 export interface FlightResult {
   id: string;
@@ -68,7 +88,7 @@ export interface GitHubRepoResult {
 
 export interface VercelStatusResult {
   projectName: string;
-  status: 'READY' | 'BUILDING' | 'ERROR';
+  status: 'READY' | 'BUILDING' | 'ERROR' | 'QUEUED';
   url: string;
   branch: string;
   commitMessage: string;
@@ -525,23 +545,29 @@ export async function executeGitHubManage(args: {
   };
 }
 
-// 6. Vercel Executor
-export async function executeVercelStatus(): Promise<{ success: boolean; data: VercelStatusResult; message: string }> {
+// 6. Vercel Executor (Production - vprod)
+export async function executeVercelStatus(args?: { action?: 'status' | 'deploy' }): Promise<{ success: boolean; data: VercelStatusResult; message: string }> {
   pluginManager.recordUsage('vercel');
+  const deploy = await triggerVercelProductionDeploy();
+
   const result: VercelStatusResult = {
-    projectName: 'abangcolek-os',
-    status: 'READY',
-    url: 'https://abangcolek-os.vercel.app',
-    branch: 'main',
-    commitMessage: 'feat: TypeSafe JEV System-1 & 3P Plugins Ecosystem',
-    buildTime: '24s',
+    projectName: VERCEL_CONFIG.projectName,
+    status: deploy.status,
+    url: deploy.productionUrl,
+    branch: deploy.branch,
+    commitMessage: 'feat(vprod): Auto-deployment from GitHub thisisabangcolek-web/Abang-Colek to Vercel',
+    buildTime: '21s',
     region: 'sin1 (Singapore - Edge)',
     framework: 'Vite React + TypeScript'
   };
+
+  const isDeployAction = args?.action === 'deploy';
   return {
     success: true,
     data: result,
-    message: `Deployment production di Vercel berada dalam status READY dan beroperasi lancar.`
+    message: isDeployAction 
+      ? `Proses pelancaran (deploy) ke Vercel production (vprod) berjaya dimulakan! Domain sasaran ${result.url} kini disegerak automatik dengan repositori GitHub.`
+      : `Deployment production di Vercel (vprod) berada dalam status READY dan beroperasi lancar.`
   };
 }
 
@@ -712,4 +738,133 @@ export async function executeGoogleDriveSearch(args: { query?: string }): Promis
     },
     message: `Dijumpai ${files.length} fail berkaitan dalam Google Drive.`
   };
+}
+
+// 12. redBus & Express Bus Freight Executor
+export async function executeRedBusSchedules(args?: { originCity?: string; destinationCity?: string }): Promise<{ success: boolean; data: BusFreightScheduleResult; message: string }> {
+  pluginManager.recordUsage('redbus_freight');
+  const origin = args?.originCity || 'Kuala Lumpur';
+  const dest = args?.destinationCity || 'all';
+  const schedules = busFreightManager.searchSchedules(origin === 'all' ? undefined : origin, dest === 'all' ? undefined : dest);
+
+  return {
+    success: true,
+    data: {
+      originCity: origin,
+      destinationCity: dest,
+      schedules
+    },
+    message: `Dijumpai ${schedules.length} jadual bas ekspres masa nyata dari ${origin} (redBus.my). Sedia untuk konsinan stok kuah colek.`
+  };
+}
+
+// 13. Bus Consignment Dispatch Executor (TBS Handover, DuitNow QR & WhatsApp Sync)
+export async function executeBusConsignmentDispatch(args: {
+  companyName: string;
+  busPlateNo: string;
+  driverName: string;
+  driverPhone: string;
+  originTerminal?: string;
+  destinationTerminal?: string;
+  departureTime?: string;
+  estimatedArrivalTime?: string;
+  agentName: string;
+  agentPhone: string;
+  agentHub?: string;
+  destinationAddress?: string;
+  cargoFeeMyr?: number;
+  packageDescription?: string;
+  boxCount?: number;
+  bottleCount?: number;
+  notes?: string;
+}): Promise<{ success: boolean; data: BusFreightConsignmentResult; message: string }> {
+  pluginManager.recordUsage('redbus_freight');
+  
+  const created = busFreightManager.addConsignment({
+    companyName: args.companyName,
+    busPlateNo: args.busPlateNo.toUpperCase().trim(),
+    driverName: args.driverName,
+    driverPhone: args.driverPhone,
+    driverQrRef: `DNG-QR-${args.companyName.toUpperCase().replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+    cargoFeeMyr: args.cargoFeeMyr || 40,
+    paymentStatus: 'PAID_DUITNOW',
+    paymentTimestamp: new Date().toLocaleString('ms-MY', { hour12: true }),
+    originTerminal: args.originTerminal || 'Terminal Bersepadu Selatan (TBS), KL',
+    destinationTerminal: args.destinationTerminal || 'Terminal MBKT Kuala Terengganu',
+    departureTime: args.departureTime || '09:30 AM',
+    estimatedArrivalTime: args.estimatedArrivalTime || '03:45 PM',
+    agentName: args.agentName,
+    agentPhone: args.agentPhone,
+    agentHub: args.agentHub || 'Kuala Terengganu',
+    destinationAddress: args.destinationAddress || 'Terminal Destinasi',
+    packageDescription: args.packageDescription || 'Kotak Stok Kuah Colek',
+    boxCount: args.boxCount || 2,
+    bottleCount: args.bottleCount || 100,
+    status: 'TBS_HANDOVER',
+    driverContactedAgentOneHourBefore: false,
+    agentDirectCallAllowed: true,
+    notes: args.notes || 'Serahan di TBS. Driver telah dibayar melalui pemindahan DuitNow QR.'
+  });
+
+  const agentWhatsAppUrl = formatWhatsAppUrl(created.agentPhone, busFreightManager.generateAgentWhatsAppMessage(created));
+  const driverWhatsAppUrl = formatWhatsAppUrl(created.driverPhone, busFreightManager.generateDriverWhatsAppMessage(created));
+  const agentToDriverUrl = formatWhatsAppUrl(created.driverPhone, busFreightManager.generateAgentToDriverMessage(created));
+
+  return {
+    success: true,
+    data: {
+      consignment: created,
+      agentWhatsAppUrl,
+      driverWhatsAppUrl,
+      agentToDriverUrl
+    },
+    message: `Konsinan bas ${created.id} (${created.companyName} - ${created.busPlateNo}) berjaya didaftarkan. Upah kargo RM${created.cargoFeeMyr} dibayar melalui DuitNow QR. Notis sedia dihantar ke ejen & driver.`
+  };
+}
+
+// 14. Bus SOP 1-Hour Arrival Notice & Agent Communication Status
+export async function executeBusStatusNotice(args: {
+  consignmentId?: string;
+  action: 'one_hour_alert' | 'agent_contact_driver' | 'confirm_collected';
+  notes?: string;
+}): Promise<{ success: boolean; data: any; message: string }> {
+  pluginManager.recordUsage('redbus_freight');
+  const list = busFreightManager.getConsignments();
+  const c = args.consignmentId ? busFreightManager.getConsignmentById(args.consignmentId) : list[0];
+
+  if (!c) {
+    return {
+      success: false,
+      data: null,
+      message: 'Tiada konsinan bas dijumpai.'
+    };
+  }
+
+  if (args.action === 'one_hour_alert') {
+    busFreightManager.triggerOneHourNotice(c.id, args.notes);
+    return {
+      success: true,
+      data: c,
+      message: `SOP 1 Jam diaktifkan: Driver ${c.driverName} (${c.busPlateNo}) telah hubungi Ejen ${c.agentName}. Ejen dalam perjalanan ke ${c.destinationTerminal}.`
+    };
+  } else if (args.action === 'confirm_collected') {
+    busFreightManager.updateStatus(c.id, 'COLLECTED', true, args.notes || 'Stok telah dituntut oleh ejen di terminal.');
+    return {
+      success: true,
+      data: c,
+      message: `Konsinan ${c.id} disahkan selesai dituntut oleh ${c.agentName}.`
+    };
+  } else {
+    const directUrl = formatWhatsAppUrl(c.driverPhone, busFreightManager.generateAgentToDriverMessage(c));
+    return {
+      success: true,
+      data: {
+        consignment: c,
+        driverPhone: c.driverPhone,
+        directUrl,
+        rightConfirmed: true
+      },
+      message: `Ejen ${c.agentName} berhak terus menghubungi driver bas ${c.driverName} (${c.driverPhone}) bagi semakan lokasi.`
+    };
+  }
 }

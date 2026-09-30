@@ -14,7 +14,7 @@ export interface SupabaseOrder {
   city: string;
   items: string;
   amount: number;
-  status: 'Processing' | 'Delivered' | 'Delayed' | 'Refunded';
+  status: 'Processing' | 'Delivered' | 'Delayed' | 'Refunded' | 'Cancelled';
   refund_reason?: string;
   created_at: string;
   delivered_date?: string;
