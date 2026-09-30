@@ -15,12 +15,18 @@ import {
 import { sendGmailMessage, listGmailMessages } from './googleGmail';
 import { createGoogleTask, listGoogleTasks } from './googleTasks';
 import { createGoogleDoc, listGoogleDocs } from './googleDocs';
+import { createCalendarEvent, listCalendarEvents } from './googleCalendar';
+import { createGoogleSpreadsheet, listGoogleSheets } from './googleSheets';
+import { createGoogleMeetSpace } from './googleMeet';
+import { sendChatMessage, listChatSpaces } from './googleChat';
+import { evaluateWithJev, JevClassificationResult } from './jevEngine';
+import { appStore } from './store';
 
 // Initialize Gemini Client
-// We use the 'gemini-2.5-flash-latest' model as requested for "Gemini Flash"
+// We use the recommended 'gemini-3.8-flash' model
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-export const MODEL_NAME = "gemini-3.1-flash-lite-preview";
+export const MODEL_NAME = "gemini-3.8-flash";
 
 export interface ChatMessage extends Content {
   timestamp: Date;
@@ -36,6 +42,16 @@ export interface ChatMessage extends Content {
   taskData?: any;
   hasDoc?: boolean;
   docData?: any;
+  hasCalendar?: boolean;
+  calendarData?: any;
+  hasSheet?: boolean;
+  sheetData?: any;
+  hasMeet?: boolean;
+  meetData?: any;
+  hasChat?: boolean;
+  chatData?: any;
+  hasJev?: boolean;
+  jevData?: JevClassificationResult;
 }
 
 export interface ToolCall {
@@ -50,19 +66,82 @@ export interface ToolResult {
   result: any;
 }
 
-// Mock & In-Memory Database for the agent to interact with (E-Commerce & Workspace data)
+// Live Persistent Database for the agent to interact with (Abang Colek & Workspace data)
 export const MOCK_DB = {
-  orders: realData.orders as any[],
-  dashboards: [] as any[],
-  reports: [] as any[],
+  get orders() { return appStore.getOrders(); },
+  dashboards: [
+    {
+      title: "Papan Pemuka Analisis Jualan Hab & Kualiti Botol (2026)",
+      kpis: [
+        { label: "Jumlah Hasil Kasar", value: "RM 4,953", trend: "+28.4%" },
+        { label: "Kadar Kepuasan Pelanggan", value: "4.6 / 5.0", trend: "+0.3" },
+        { label: "Kadar Isu Botol Bocor", value: "10.0%", trend: "-2.1%" },
+        { label: "Pesanan Aktif Diproses", value: "3 Pesanan", trend: "Normal" }
+      ],
+      main_chart: {
+        title: "Hasil Jualan Mengikut Wilayah Hab (RM)",
+        type: "Bar",
+        data: [
+          { label: "Kuala Terengganu", value: 3455 },
+          { label: "Shah Alam", value: 685 },
+          { label: "Johor Bahru (HQ)", value: 155 },
+          { label: "Pulau Pinang", value: 120 },
+          { label: "Bangi", value: 90 },
+          { label: "Melaka", value: 75 }
+        ]
+      },
+      secondary_chart: {
+        title: "Pecahan Kategori Produk Terlaris (%)",
+        type: "Progress",
+        data: [
+          { label: "Kuah Colek Buah Original (500g)", value: 68 },
+          { label: "Pakej Niaga Ejen (50 Botol)", value: 20 },
+          { label: "Jeruk Mangga & Kedondong", value: 12 }
+        ]
+      },
+      recent_activity: [
+        { text: "Stokis Terengganu menerima penghantaran lori sejuk 300 botol Kuah Colek & Jerux Liur Leleh." },
+        { text: "Pakej Niaga Ejen 50 Botol dihantar kepada stokis baharu di Shah Alam." },
+        { text: "Triage JEV mengesan isu retak penutup botol di KL dan bayaran balik RM35 berjaya diproses serta-merta." },
+        { text: "Krew Styloairpool selesai penutupan jualan pop-up booth di Toppen Shopping Centre JB." }
+      ]
+    }
+  ] as any[],
+  reports: [
+    {
+      title: "Laporan Prestasi Operasi & Jualan Kuah Colek Abang Colek 2026",
+      year: "2026",
+      executive_summary: "Prestasi jualan suku ketiga tahun 2026 menunjukkan peningkatan ketara sebanyak 28.4% disokong oleh permintaan tinggi di Pantai Timur (Kuala Terengganu) dan Lembah Klang melalui model ejen borong dan gerai pop-up Styloairpool. Walau bagaimanapun, isu integriti penutup botol semasa penghantaran jarak jauh kurier memerlukan penambahbaikan SOP pembungkusan.",
+      metrics: [
+        { label: "Jumlah Hasil Jualan", value: 4953, trend: "+28.4%" },
+        { label: "Pesanan Selesai", value: 15, trend: "+12.0%" },
+        { label: "Purata Nilai Pesanan (AOV)", value: 247, trend: "+15.2%" }
+      ],
+      detailed_analysis: "### Ringkasan Analisis Mengikut Hab:\n- **Kuala Terengganu (Pantai Timur)**: Penyumbang hasil terbesar (RM3,455) didorong oleh pembelian pukal pakej stokis negeri (300 botol) dan pakej ejen permulaan (50 botol).\n- **Shah Alam & Lembah Klang**: Permintaan konsisten untuk Kuah Colek Buah Original dan pakej ejen permulaan bernilai RM550.\n- **Johor Bahru (HQ & Pop-up Toppen)**: Jualan harian stabil bagi set buah potong segar dan botol pencicah pedas manis di Toppen dan Pasar Karat JB.\n\n### Isu Kualiti & Logistik (JEV Triage):\n- Isu penutup botol bocor (`LEAKAGE` / `SEAL_FAILURE`) dikesan pada 2 pesanan luar negeri (10%). Punca asas dikelaskan sebagai `UNDETERMINED` sehingga semakan ujian tekanan penutup botol bersama pembekal selesai.",
+      key_insights: [
+        "Pakej ejen borong 50 botol dan stokis 300 botol menyumbang lebih 80% daripada nilai keseluruhan jualan.",
+        "Aduan kebocoran botol (LEAKAGE) tertumpu kepada penghantaran kurier jarak jauh (Terengganu & KL), memerlukan peningkatan kualiti seal penutup botol.",
+        "Jualan langsung di gerai pop-up Toppen dan Pasar Karat JB mempunyai kadar penukaran tunai tertinggi tanpa kos logistik kurier."
+      ],
+      recommendations: [
+        "Perketatkan SOP pembungkusan penutup botol dengan induction sealing sebelum serahan kepada syarikat kurier.",
+        "Wujudkan sistem pra-pesanan automatik di WhatsApp & Google Sheets untuk pusingan stokis Terengganu.",
+        "Perluaskan rangkaian ejen negeri ke Pulau Pinang dan Perak berdasarkan volum pertanyaan ulasan yang tinggi."
+      ]
+    }
+  ] as any[],
   agents: [] as any[],
-  reviews: realData.reviews as any[],
+  get reviews() { return appStore.getReviews(); },
   customer_responses: [] as any[],
   forms: [] as any[],
   form_responses: [] as any[],
   emails: [] as any[],
   tasks: [] as any[],
   docs: [] as any[],
+  events: [] as any[],
+  sheets: [] as any[],
+  meet_spaces: [] as any[],
+  chat_messages: [] as any[],
 };
 
 // Tool Definitions
@@ -71,49 +150,88 @@ export const tools = [
     functionDeclarations: [
       {
         name: "analyze_sales_performance",
-        description: "Fetches revenue and order volume data by date range or category.",
+        description: "Fetches revenue (MYR) and order volume data for Abang Colek by date range, category, or Malaysian city.",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            date_range: { type: Type.STRING, description: "e.g., '2023-Q4' or 'last 30 days'" },
+            date_range: { type: Type.STRING, description: "e.g., '2026-Q3' or 'last 30 days'" },
             group_by: { type: Type.STRING, description: "e.g., 'product_category', 'city'" },
-            city: { type: Type.STRING, description: "Optional city to filter sales data by (e.g., 'sao paulo')" }
+            city: { type: Type.STRING, description: "Optional Malaysian city to filter sales data by (e.g., 'johor bahru', 'shah alam', 'kuala terengganu', 'bangi')" }
           },
           required: ["date_range"],
         },
       },
       {
         name: "investigate_shipping_delays",
-        description: "Cross-references delivery dates to find bottlenecks.",
+        description: "Cross-references delivery dates to find bottlenecks in courier shipments across Malaysia.",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            region: { type: Type.STRING, description: "e.g., 'São Paulo'" },
+            region: { type: Type.STRING, description: "e.g., 'kuala terengganu', 'melaka', 'shah alam'" },
           },
           required: [],
         },
       },
       {
         name: "analyze_customer_sentiment",
-        description: "Pulls review scores and text for specific products or generally.",
+        description: "Pulls review scores and text for Abang Colek Kuah Colek Buah, rojak, jeruk, or packaging issues.",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            product_category: { type: Type.STRING, description: "Category of product, e.g. 'electronics'" },
-            score_filter: { type: Type.NUMBER, description: "Review score to filter by, e.g. 1" }
+            product_category: { type: Type.STRING, description: "Category of product (e.g. 'kuah colek', 'jeruk', 'buah potong')" },
+            score_filter: { type: Type.NUMBER, description: "Review score to filter by (1 to 5)" }
           },
           required: [],
         },
       },
       {
+        name: "jev_classify_issue",
+        description: "Runs the TypeSafe JEV System-1 engine on a customer inquiry, complaint, or operational message across 7 dimensions (Brand, BusinessFunction, SalesChannel, CustomerIntent, IssueClass, ProcessStage, RootCauseStatus) and returns confidence scores and recommended SOPs.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            message: { type: Type.STRING, description: "Customer complaint, inquiry, or operational text to evaluate" }
+          },
+          required: ["message"]
+        }
+      },
+      {
+        name: "update_business_workflow",
+        description: "Updates owner sign-off and operational status for one of the 8 Foundational Business Questions (e.g., 'ORDER_FLOW', 'COMPLAINT_TRACE', 'AGENT_RESTOCK', etc.)",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            workflow_id: { type: Type.STRING, description: "One of the 8 IDs: ORDER_FLOW, STOCK_OWNERSHIP, AGENT_RESTOCK, COMPLAINT_TRACE, PRODUCTION_TRACE, TRANSPORT_TRACE, EVENT_CREW, PAYMENT_CLOSE" },
+            signoff: { type: Type.BOOLEAN, description: "True to verify and sign off, false to gate" },
+            notes: { type: Type.STRING, description: "Operational notes or SOP policy decided" }
+          },
+          required: ["workflow_id", "signoff"]
+        }
+      },
+      {
+        name: "create_order",
+        description: "Creates and records a real customer or agent order in the Abang Colek database.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            customer_id: { type: Type.STRING, description: "Customer name or phone/ID" },
+            city: { type: Type.STRING, description: "Delivery city (e.g., 'johor bahru', 'shah alam', 'kuala terengganu', 'bangi')" },
+            items: { type: Type.STRING, description: "List of items ordered (e.g., '5x Kuah Colek Buah Original (500g)')" },
+            amount: { type: Type.NUMBER, description: "Total order amount in MYR (RM)" },
+            status: { type: Type.STRING, description: "Order status: 'Processing' | 'Delivered' | 'Delayed'" }
+          },
+          required: ["customer_id", "city", "items", "amount"]
+        }
+      },
+      {
         name: "issue_refund",
-        description: "Updates the status of an order in the database and records a refund.",
+        description: "Updates the status of an order in the database and records a refund in MYR (RM).",
         parameters: {
           type: Type.OBJECT,
           properties: {
             order_id: { type: Type.STRING, description: "The ID of the order to refund" },
-            refund_amount: { type: Type.NUMBER, description: "The amount to refund" },
-            reason_code: { type: Type.STRING, description: "Reason for the refund" }
+            refund_amount: { type: Type.NUMBER, description: "The amount in MYR (RM) to refund" },
+            reason_code: { type: Type.STRING, description: "Reason for the refund (e.g., 'LEAKAGE - Botol bocor')" }
           },
           required: ["order_id", "refund_amount"],
         },
@@ -343,6 +461,75 @@ export const tools = [
           properties: {},
           required: []
         }
+      },
+      {
+        name: "schedule_calendar_event",
+        description: "Schedules a business meeting, operational review, or reminder event in Google Calendar.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING, description: "Title of the calendar event" },
+            start_time: { type: Type.STRING, description: "ISO 8601 start date-time string (e.g. 2026-10-01T10:00:00Z)" },
+            end_time: { type: Type.STRING, description: "ISO 8601 end date-time string (e.g. 2026-10-01T11:00:00Z)" },
+            description: { type: Type.STRING, description: "Meeting description or agenda" },
+            location: { type: Type.STRING, description: "Meeting location or conference link" }
+          },
+          required: ["summary", "start_time", "end_time"]
+        }
+      },
+      {
+        name: "list_calendar_events",
+        description: "Retrieves upcoming events from the user's primary Google Calendar.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            max_results: { type: Type.NUMBER, description: "Maximum number of events to return" }
+          },
+          required: []
+        }
+      },
+      {
+        name: "create_google_sheet",
+        description: "Creates and exports tabular data (sales reports, orders list, metrics) into a live Google Spreadsheet.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "Title of the spreadsheet" },
+            headers: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Column header names" },
+            rows: { 
+              type: Type.ARRAY, 
+              items: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING } 
+              }, 
+              description: "2D array of rows values" 
+            }
+          },
+          required: ["title", "headers", "rows"]
+        }
+      },
+      {
+        name: "create_meet_space",
+        description: "Creates a Google Meet video conference space for rapid collaboration or client meetings.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "Optional topic or purpose of the meeting" }
+          },
+          required: []
+        }
+      },
+      {
+        name: "send_chat_message",
+        description: "Sends a direct message or channel update to a Google Chat space.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            space_name: { type: Type.STRING, description: "Google Chat space identifier (e.g., 'spaces/AAAAAAAAAAA')" },
+            message_text: { type: Type.STRING, description: "The content text of the message to send" }
+          },
+          required: ["space_name", "message_text"]
+        }
       }
     ],
   },
@@ -378,29 +565,25 @@ export async function sendMessageToAgentStream(
   
     const config = {
     tools: tools,
-    systemInstruction: `You are a top-tier E-Commerce Operations Agent for a fast-growing marketplace. 
-      Your goal is to autonomously analyze sales data, handle customer service tasks, manage orders, and build reporting artifacts.
-      
-      Capabilities:
-      1. Analysis: Analyze sales performance using 'analyze_sales_performance' and 'investigate_shipping_delays'.
-      2. Customer Service: Analyze feedback using 'analyze_customer_sentiment', draft responses with 'draft_customer_response', and process refunds using 'issue_refund'.
-      3. Reporting: Synthesize findings into executive summaries using 'generate_yearly_report'.
-      4. Visualization: Construct data dashboards for specific metrics using 'create_operations_dashboard'.
-      5. Sub-Agents: For complex multi-step market research or deep-dive tasks, use 'start_ai_agent'.
+    systemInstruction: `You are the master AI Operations Agent for ABANGCOLEK-OS (v4.2), the operational intelligence system for Malaysia's premier F&B fruit-dip brand ABANGCOLEK and STYLOAIRPOOL.
+Your goal is to autonomously handle retail operations, investigate packaging and shipping issues (especially bottle seal leakage 'LEAKAGE'), manage regional stockists (Terengganu, Shah Alam, Bangi), manage live orders in Malaysian Ringgit (MYR/RM), and orchestrate Google Workspace workflows (Gmail, Tasks, Docs, Sheets, Forms, Meet, Calendar, Maps).
 
-      Behavior:
-        - Be proactive and comprehensive. If asked about delayed orders, use 'investigate_shipping_delays' and proactively check reviews or issue refunds if appropriate.
-        - CRITICAL: Never ask for missing details to complete a tool call if you can infer them or if it's a general request. If asked to "create a dashboard for sales", use 'analyze_sales_performance' to get data, then use 'create_operations_dashboard'.
-        - STRICT TOOL USAGE: If the user explicitly asks for a "report", you MUST use the 'generate_yearly_report' tool. If the user explicitly asks for a "dashboard", you MUST use the 'create_operations_dashboard' tool. Do not substitute one for the other.
-        - When creating dashboards using 'create_operations_dashboard', always try to use aggregated data from tool results (like 'breakdown_by_city', 'monthly_breakdown', 'top_cities_revenue', 'order_status_breakdown', or 'score_distribution') to create rich, multi-bar/multi-line charts rather than single-metric dashboards.
-        - When using 'generate_yearly_report', DO NOT just use top-line totals in the 'metrics' array. You MUST include specific, granular metrics (e.g., 'December Revenue', 'Processing Orders', 'Top City Revenue', etc.) based on the tool's detailed breakdown data to make the report cards highly specific to the user's query.
-        - CRITICAL RULE FOR LABELS: When creating dashboards or reports, NEVER use generic labels like "Total Revenue" or "Total Orders" if the user asked for a specific filter (like a city, timeframe, or category). You MUST dynamically change the label to reflect the exact user request and the data (e.g., "Vianopolis Revenue", "Q3 2017 Orders", "Delivered Orders", etc.). The labels must clearly communicate exactly what data is being shown.
-        - Ensure reports generated via 'generate_yearly_report' are extremely comprehensive. Include detailed analysis, specific metric objects with trends, and strategic recommendations. CRITICAL: Do NOT use markdown formatting (like **bold**, *italics*, or # headers) in the 'detailed_analysis' string for reports, keep it plain text.
-        - CRITICAL RULE FOR MISSING DATA: If you use a tool (like 'analyze_sales_performance') and it returns 0 orders or 0 revenue, DO NOT hallucinate, invent, or estimate data. Explicitly inform the user that there is no data available for that timeframe or category, and DO NOT generate a report or dashboard. Note that the available database only contains records from 2017 and 2018.
-      - Be concise in text responses, but heavily leverage tools to showcase your advanced reasoning and versatile reporting capabilities.
-      - Explain briefly what you are doing (e.g., "Analyzing Q3 sales data...", "Drafting customer response...", "Processing refund...").
-      - When you call generate_yearly_report or create_operations_dashboard, do not output any conversational text afterwards.
-      `,
+Core Business Knowledge:
+- Core Products: Kuah Colek Buah Original (500g), Colek Padu Crispy Fruit Dip, Jeruk Mangga Asam Boi, Jeruk Kedondong Rangup, Pakej Niaga Ejen Permulaan (50 Botol Kuah Colek).
+- Real Malaysian Hubs: Johor Bahru (HQ & Toppen booth, Pasar Karat), Shah Alam Central Hub, Bangi Pop-up Hub, Kuala Terengganu Stokis (@jeruxsliurlelehterengganu), Kota Bharu, Melaka, and Penang.
+- Currency: ALWAYS use Malaysian Ringgit (RM) for all amounts.
+- TypeSafe JEV System-1: Use 'jev_classify_issue' whenever evaluating a customer complaint or message across 7 dimensions (Brand, BusinessFunction, SalesChannel, CustomerIntent, IssueClass, ProcessStage, RootCauseStatus).
+- Strict Root Cause Invariant: For bottle leakage/seal issues, issueClass is 'LEAKAGE' or 'SEAL_FAILURE', but Root Cause MUST remain 'UNDETERMINED' until factory lot or shipping defect proof is verified.
+- 8 Foundational Business Questions: Use 'update_business_workflow' to manage owner sign-off and risk status for ORDER_FLOW, STOCK_OWNERSHIP, AGENT_RESTOCK, COMPLAINT_TRACE, PRODUCTION_TRACE, TRANSPORT_TRACE, EVENT_CREW, PAYMENT_CLOSE.
+- Live Orders: Use 'create_order' to record new sales or 'issue_refund' to approve refunds with persistent tracking.
+- Google Workspace: Fully utilize 'send_gmail_email', 'create_google_task', 'create_google_doc', 'schedule_calendar_event', 'create_google_sheet', 'create_google_form', 'create_meet_space', and 'send_chat_message'.
+
+Behavior:
+- Be proactive, efficient, and direct in Malay or English as requested by the user.
+- Strictly ground all metrics in the live database without hallucinating foreign data.
+- When creating dashboards, use aggregated data from tool results (like 'monthly_breakdown', 'top_cities_revenue', 'order_status_breakdown').
+- When generating reports with 'generate_yearly_report', include detailed analysis, specific metric objects with trends, and strategic recommendations.
+- When you call generate_yearly_report or create_operations_dashboard, do not output any conversational text afterwards.`,
   };
 
   let currentHistory = [...history];
@@ -605,14 +788,44 @@ export async function sendMessageToAgentStream(
               };
               await new Promise(r => setTimeout(r, 800));
             } else if (call.name === "issue_refund") {
-              let order = MOCK_DB.orders.find((o: any) => o.order_id === call.args.order_id);
-              if (order) {
-                order.status = "Refunded";
-                output = { success: true, message: `Refund of $${call.args.refund_amount} issued for order ${call.args.order_id}.` };
+              const success = appStore.issueRefund(call.args.order_id, call.args.refund_amount, call.args.reason_code || 'Aduan kualiti');
+              if (success) {
+                output = { success: true, message: `Bayaran balik sebanyak RM${call.args.refund_amount} telah berjaya diluluskan dan direkodkan untuk pesanan ${call.args.order_id}.` };
               } else {
-                output = { success: false, message: `Order ${call.args.order_id} not found.` };
+                output = { success: false, message: `Pesanan ${call.args.order_id} tidak ditemui dalam pangkalan data.` };
               }
-              await new Promise(r => setTimeout(r, 800));
+              await new Promise(r => setTimeout(r, 400));
+            } else if (call.name === "jev_classify_issue") {
+              try {
+                const jevRes = await evaluateWithJev(call.args.message);
+                output = {
+                  success: true,
+                  message: `JEV System-1 mengelaskan isu sebagai [${jevRes.dimensions.issueClass.value}] (${(jevRes.dimensions.issueClass.confidence * 100).toFixed(0)}% keyakinan). Urgensi: ${jevRes.primitives.urgencyScore.score}/5.0. Tindakan disyorkan: ${jevRes.recommendedAction}`,
+                  data: jevRes
+                };
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
+            } else if (call.name === "update_business_workflow") {
+              const updated = appStore.updateWorkflowSignoff(call.args.workflow_id, call.args.signoff, call.args.notes);
+              output = {
+                success: Boolean(updated),
+                message: updated ? `Aliran kerja ${call.args.workflow_id} berjaya dikemas kini status kepada ${updated.status}.` : `Aliran kerja tidak dijumpai.`,
+                data: updated
+              };
+            } else if (call.name === "create_order") {
+              const newOrder = appStore.addOrder({
+                customer_id: call.args.customer_id,
+                city: call.args.city,
+                items: call.args.items,
+                amount: Number(call.args.amount) || 0,
+                status: (call.args.status as any) || 'Processing'
+              });
+              output = {
+                success: true,
+                message: `Pesanan baharu ${newOrder.order_id} telah berjaya direkodkan bagi ${newOrder.customer_id} (RM${newOrder.amount}) di ${newOrder.city}.`,
+                data: newOrder
+              };
             } else if (call.name === "draft_customer_response") {
               MOCK_DB.customer_responses.push(call.args);
               output = { success: true, message: `Draft response saved for customer ${call.args.customer_id}.` };
@@ -819,6 +1032,150 @@ export async function sendMessageToAgentStream(
               } catch (err: any) {
                 output = { success: false, error: err.message };
               }
+            } else if (call.name === "schedule_calendar_event") {
+              try {
+                const token = await getAccessToken();
+                const args = (call.args || {}) as any;
+                if (token) {
+                  const event = await createCalendarEvent(
+                    args.summary,
+                    args.start_time,
+                    args.end_time,
+                    args.description,
+                    args.location
+                  );
+                  MOCK_DB.events.unshift(event);
+                  output = {
+                    success: true,
+                    message: `Scheduled calendar event: "${args.summary}" in Google Calendar!`,
+                    data: event
+                  };
+                } else {
+                  const localEvent = {
+                    id: 'cal_' + Date.now(),
+                    summary: args.summary,
+                    start: { dateTime: args.start_time },
+                    end: { dateTime: args.end_time },
+                    description: args.description,
+                    location: args.location
+                  };
+                  MOCK_DB.events.unshift(localEvent);
+                  output = {
+                    success: true,
+                    message: `Calendar event prepared: "${args.summary}".`,
+                    data: localEvent
+                  };
+                }
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
+            } else if (call.name === "list_calendar_events") {
+              try {
+                const token = await getAccessToken();
+                const args = (call.args || {}) as any;
+                let eventsList: any[] = [];
+                if (token) {
+                  eventsList = await listCalendarEvents(args.max_results || 10);
+                }
+                output = { success: true, events: eventsList };
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
+            } else if (call.name === "create_google_sheet") {
+              try {
+                const token = await getAccessToken();
+                const args = (call.args || {}) as any;
+                if (token) {
+                  const sheetRes = await createGoogleSpreadsheet(
+                    args.title,
+                    args.headers || [],
+                    args.rows || []
+                  );
+                  MOCK_DB.sheets.unshift({ id: sheetRes.spreadsheetId, name: args.title, webViewLink: sheetRes.spreadsheetUrl });
+                  output = {
+                    success: true,
+                    message: `Created spreadsheet "${args.title}" in Google Drive!`,
+                    spreadsheetId: sheetRes.spreadsheetId,
+                    url: sheetRes.spreadsheetUrl,
+                    data: sheetRes
+                  };
+                } else {
+                  const localSheet = {
+                    id: 'sheet_' + Date.now(),
+                    name: args.title,
+                    headers: args.headers,
+                    rows: args.rows
+                  };
+                  MOCK_DB.sheets.unshift(localSheet);
+                  output = {
+                    success: true,
+                    message: `Google Spreadsheet drafted: "${args.title}".`,
+                    data: localSheet
+                  };
+                }
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
+            } else if (call.name === "create_meet_space") {
+              try {
+                const token = await getAccessToken();
+                const args = (call.args || {}) as any;
+                if (token) {
+                  const space = await createGoogleMeetSpace();
+                  MOCK_DB.meet_spaces.unshift(space);
+                  output = {
+                    success: true,
+                    message: `Google Meet space created: ${space.meetingUri || space.name}`,
+                    meetingUri: space.meetingUri,
+                    name: space.name,
+                    data: space
+                  };
+                } else {
+                  const mockCode = `${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`;
+                  const localSpace = {
+                    name: `spaces/${mockCode}`,
+                    meetingUri: `https://meet.google.com/${mockCode}`,
+                    meetingCode: mockCode,
+                  };
+                  MOCK_DB.meet_spaces.unshift(localSpace);
+                  output = {
+                    success: true,
+                    message: `Google Meet room generated: ${localSpace.meetingUri}`,
+                    meetingUri: localSpace.meetingUri,
+                    data: localSpace
+                  };
+                }
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
+            } else if (call.name === "send_chat_message") {
+              try {
+                const token = await getAccessToken();
+                const args = (call.args || {}) as any;
+                if (token) {
+                  const chatRes = await sendChatMessage(args.space_name, args.message_text);
+                  output = {
+                    success: true,
+                    message: `Message posted to Google Chat space!`,
+                    data: chatRes
+                  };
+                } else {
+                  const localChat = {
+                    name: `spaces/local/messages/${Date.now()}`,
+                    text: args.message_text,
+                    space: args.space_name,
+                    createTime: new Date().toISOString()
+                  };
+                  MOCK_DB.chat_messages.unshift(localChat);
+                  output = {
+                    success: true,
+                    message: `Message sent to workspace chat.`,
+                    data: localChat
+                  };
+                }
+              } catch (err: any) {
+                output = { success: false, error: err.message };
+              }
             }
 
             const toolEndTime = performance.now();
@@ -863,6 +1220,11 @@ export async function sendMessageToAgentStream(
     const generatedEmailStep = steps.find(s => s.type === 'tool' && s.toolName === "send_gmail_email");
     const generatedTaskStep = steps.find(s => s.type === 'tool' && s.toolName === "create_google_task");
     const generatedDocStep = steps.find(s => s.type === 'tool' && s.toolName === "create_google_doc");
+    const generatedCalendarStep = steps.find(s => s.type === 'tool' && s.toolName === "schedule_calendar_event");
+    const generatedSheetStep = steps.find(s => s.type === 'tool' && s.toolName === "create_google_sheet");
+    const generatedMeetStep = steps.find(s => s.type === 'tool' && s.toolName === "create_meet_space");
+    const generatedChatStep = steps.find(s => s.type === 'tool' && s.toolName === "send_chat_message");
+    const generatedJevStep = steps.find(s => s.type === 'tool' && s.toolName === "jev_classify_issue");
 
     const modelMsg: ChatMessage = {
       role: "model",
@@ -879,6 +1241,16 @@ export async function sendMessageToAgentStream(
       taskData: generatedTaskStep?.result?.data,
       hasDoc: Boolean(generatedDocStep),
       docData: generatedDocStep?.result?.data,
+      hasCalendar: Boolean(generatedCalendarStep),
+      calendarData: generatedCalendarStep?.result?.data,
+      hasSheet: Boolean(generatedSheetStep),
+      sheetData: generatedSheetStep?.result?.data,
+      hasMeet: Boolean(generatedMeetStep),
+      meetData: generatedMeetStep?.result?.data,
+      hasChat: Boolean(generatedChatStep),
+      chatData: generatedChatStep?.result?.data,
+      hasJev: Boolean(generatedJevStep),
+      jevData: generatedJevStep?.result?.data,
     };
     currentHistory.push(modelMsg);
     
@@ -926,30 +1298,22 @@ console.log(MODEL_NAME)
     
     const config = {
       tools: tools,
-      systemInstruction: `You are a top-tier E-Commerce Operations Agent. 
-        Your goal is to autonomously analyze sales data, handle customer service tasks, manage orders, and build reporting artifacts.
-        
-        Capabilities:
-        1. Analysis: Analyze sales performance using 'analyze_sales_performance' and 'investigate_shipping_delays'.
-        2. Customer Service: Analyze feedback using 'analyze_customer_sentiment', draft responses with 'draft_customer_response', and process refunds using 'issue_refund'.
-        3. Reporting: Synthesize findings into executive summaries using 'generate_yearly_report'.
-        4. Visualization: Construct data dashboards for specific metrics using 'create_operations_dashboard'.
-        5. Sub-Agents: For complex multi-step market research or deep-dive tasks, use 'start_ai_agent'.
-  
-        Behavior:
-        - Be proactive and comprehensive. If asked about delayed orders, use 'investigate_shipping_delays' and proactively check reviews or issue refunds if appropriate.
-        - CRITICAL: Never ask for missing details to complete a tool call if you can infer them or if it's a general request. If asked to "create a dashboard for sales", use 'analyze_sales_performance' to get data, then use 'create_operations_dashboard'.
-        - STRICT TOOL USAGE: If the user explicitly asks for a "report", you MUST use the 'generate_yearly_report' tool. If the user explicitly asks for a "dashboard", you MUST use the 'create_operations_dashboard' tool. Do not substitute one for the other.
-        - When creating dashboards using 'create_operations_dashboard', always try to use aggregated data from tool results (like 'breakdown_by_city', 'monthly_breakdown', 'top_cities_revenue', 'order_status_breakdown', or 'score_distribution') to create rich, multi-bar/multi-line charts rather than single-metric dashboards.
-        - When using 'generate_yearly_report', DO NOT just use top-line totals in the 'metrics' array. You MUST include specific, granular metrics (e.g., 'December Revenue', 'Processing Orders', 'Top City Revenue', etc.) based on the tool's detailed breakdown data to make the report cards highly specific to the user's query.
-        - CRITICAL RULE FOR LABELS: When creating dashboards or reports, NEVER use generic labels like "Total Revenue" or "Total Orders" if the user asked for a specific filter (like a city, timeframe, or category). You MUST dynamically change the label to reflect the exact user request and the data (e.g., "Vianopolis Revenue", "Q3 2017 Orders", "Delivered Orders", etc.). The labels must clearly communicate exactly what data is being shown.
-        - Ensure reports generated via 'generate_yearly_report' are extremely comprehensive. Include detailed analysis, specific metric objects with trends, and strategic recommendations. CRITICAL: Do NOT use markdown formatting (like **bold**, *italics*, or # headers) in the 'detailed_analysis' string for reports, keep it plain text.
-        - CRITICAL RULE FOR MISSING DATA: If you use a tool (like 'analyze_sales_performance') and it returns 0 orders or 0 revenue, DO NOT hallucinate, invent, or estimate data. Explicitly inform the user that there is no data available for that timeframe or category, and DO NOT generate a report or dashboard. Note that the available database only contains records from 2017 and 2018.
-        - CRITICAL RULE FOR RESPONDING: NEVER use the words "invent", "fake", "dummy", "generate realistic data", or "made up" in your text response to the user. Always speak to the user as if the data you pulled, processed, or generated is 100% real and already existed in the database. Be confident and professional.
-        - Be concise in text responses, but heavily leverage tools to showcase your advanced reasoning and versatile reporting capabilities.
-        - Explain briefly what you are doing (e.g., "Analyzing Q3 sales data...", "Drafting customer response...", "Processing refund...").
-        - When you call generate_yearly_report or create_operations_dashboard, do not output any conversational text afterwards.
-        `,
+      systemInstruction: `You are the master AI Operations Agent for ABANGCOLEK-OS (v4.2), the operational intelligence system for Malaysia's premier F&B fruit-dip brand ABANGCOLEK and STYLOAIRPOOL.
+Your goal is to autonomously handle retail operations, investigate packaging and shipping issues (especially bottle seal leakage 'LEAKAGE'), manage regional stockists (Terengganu, Shah Alam, Bangi), manage live orders in Malaysian Ringgit (MYR/RM), and orchestrate Google Workspace workflows (Gmail, Tasks, Docs, Sheets, Forms, Meet, Calendar, Maps).
+
+Core Business Knowledge:
+- Core Products: Kuah Colek Buah Original (500g), Colek Padu Crispy Fruit Dip, Jeruk Mangga Asam Boi, Jeruk Kedondong Rangup, Pakej Niaga Ejen Permulaan (50 Botol Kuah Colek).
+- Real Malaysian Hubs: Johor Bahru (HQ & Toppen booth, Pasar Karat), Shah Alam Central Hub, Bangi Pop-up Hub, Kuala Terengganu Stokis (@jeruxsliurlelehterengganu), Kota Bharu, Melaka, and Penang.
+- Currency: ALWAYS use Malaysian Ringgit (RM) for all amounts.
+- TypeSafe JEV System-1: Use 'jev_classify_issue' whenever evaluating a customer complaint or message across 7 dimensions (Brand, BusinessFunction, SalesChannel, CustomerIntent, IssueClass, ProcessStage, RootCauseStatus).
+- Strict Root Cause Invariant: For bottle leakage/seal issues, issueClass is 'LEAKAGE' or 'SEAL_FAILURE', but Root Cause MUST remain 'UNDETERMINED' until factory lot or shipping defect proof is verified.
+- 8 Foundational Business Questions: Use 'update_business_workflow' to manage owner sign-off and risk status for ORDER_FLOW, STOCK_OWNERSHIP, AGENT_RESTOCK, COMPLAINT_TRACE, PRODUCTION_TRACE, TRANSPORT_TRACE, EVENT_CREW, PAYMENT_CLOSE.
+- Live Orders: Use 'create_order' to record new sales or 'issue_refund' to approve refunds with persistent tracking.
+- Google Workspace: Fully utilize 'send_gmail_email', 'create_google_task', 'create_google_doc', 'schedule_calendar_event', 'create_google_sheet', 'create_google_form', 'create_meet_space', and 'send_chat_message'.
+
+Behavior:
+- Be proactive, efficient, and direct in Malay or English as requested by the user.
+- Strictly ground all metrics in the live database without hallucinating foreign data.`,
     };
 
   
@@ -976,6 +1340,7 @@ console.log(MODEL_NAME)
     let maxSteps = 5;
     let step = 0;
     const allToolCallRecords: ToolCall[] = [];
+    const allToolOutputs: { name: string; result: any }[] = [];
 
     while (keepGoing && step < maxSteps) {
       step++;
@@ -1105,13 +1470,47 @@ console.log(MODEL_NAME)
               data: relevantReviews.slice(0, 10) 
             };
           } else if (call.name === "issue_refund") {
-            let order = MOCK_DB.orders.find((o: any) => o.order_id === call.args.order_id);
-            if (order) {
-              order.status = "Refunded";
-              output = { success: true, message: `Refund of $${call.args.refund_amount} issued for order ${call.args.order_id}.` };
+            const args = (call.args || {}) as any;
+            const success = appStore.issueRefund(String(args.order_id), Number(args.refund_amount) || 0, String(args.reason_code || 'Aduan kualiti'));
+            if (success) {
+              output = { success: true, message: `Bayaran balik sebanyak RM${args.refund_amount} telah berjaya diluluskan dan direkodkan untuk pesanan ${args.order_id}.` };
             } else {
-              output = { success: false, message: `Order ${call.args.order_id} not found.` };
+              output = { success: false, message: `Pesanan ${args.order_id} tidak ditemui dalam pangkalan data.` };
             }
+          } else if (call.name === "jev_classify_issue") {
+            try {
+              const args = (call.args || {}) as any;
+              const jevRes = await evaluateWithJev(String(args.message || ''));
+              output = {
+                success: true,
+                message: `JEV System-1 mengelaskan isu sebagai [${jevRes.dimensions.issueClass.value}] (${(jevRes.dimensions.issueClass.confidence * 100).toFixed(0)}% keyakinan). Urgensi: ${jevRes.primitives.urgencyScore.score}/5.0. Tindakan disyorkan: ${jevRes.recommendedAction}`,
+                data: jevRes
+              };
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "update_business_workflow") {
+            const args = (call.args || {}) as any;
+            const updated = appStore.updateWorkflowSignoff(String(args.workflow_id), Boolean(args.signoff), args.notes ? String(args.notes) : undefined);
+            output = {
+              success: Boolean(updated),
+              message: updated ? `Aliran kerja ${args.workflow_id} berjaya dikemas kini status kepada ${updated.status}.` : `Aliran kerja tidak dijumpai.`,
+              data: updated
+            };
+          } else if (call.name === "create_order") {
+            const args = (call.args || {}) as any;
+            const newOrder = appStore.addOrder({
+              customer_id: String(args.customer_id || ''),
+              city: String(args.city || 'johor bahru'),
+              items: String(args.items || ''),
+              amount: Number(args.amount) || 0,
+              status: (args.status as any) || 'Processing'
+            });
+            output = {
+              success: true,
+              message: `Pesanan baharu ${newOrder.order_id} telah berjaya direkodkan bagi ${newOrder.customer_id} (RM${newOrder.amount}) di ${newOrder.city}.`,
+              data: newOrder
+            };
           } else if (call.name === "draft_customer_response") {
             MOCK_DB.customer_responses.push(call.args);
             output = { success: true, message: `Draft response saved for customer ${call.args.customer_id}.` };
@@ -1199,6 +1598,113 @@ console.log(MODEL_NAME)
             } catch (err: any) {
               output = { success: false, error: err.message };
             }
+          } else if (call.name === "send_gmail_email") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const res = await sendGmailMessage(args.to, args.subject, args.body);
+                output = { success: true, message: `Email sent to ${args.to} via Gmail!`, data: { to: args.to, subject: args.subject, body: args.body, id: res.id } };
+              } else {
+                MOCK_DB.emails.unshift(args);
+                output = { success: true, message: `Email prepared for ${args.to} in workspace.`, data: args };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "create_google_task") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const task = await createGoogleTask('@default', args.title, args.notes, args.due);
+                output = { success: true, message: `Created task "${args.title}" in Google Tasks!`, data: task };
+              } else {
+                const task = { id: 'task_' + Date.now(), title: args.title, notes: args.notes, due: args.due, status: 'needsAction' };
+                MOCK_DB.tasks.unshift(task);
+                output = { success: true, message: `Task "${args.title}" added to workspace.`, data: task };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "create_google_doc") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const doc = await createGoogleDoc(args.title, args.content);
+                output = { success: true, message: `Created Google Document "${args.title}"!`, documentId: doc.documentId, data: doc };
+              } else {
+                const doc = { id: 'doc_' + Date.now(), name: args.title, content: args.content };
+                MOCK_DB.docs.unshift(doc);
+                output = { success: true, message: `Google Document drafted: "${args.title}".`, data: doc };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "schedule_calendar_event") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const event = await createCalendarEvent(args.summary, args.start_time, args.end_time, args.description, args.location);
+                MOCK_DB.events.unshift(event);
+                output = { success: true, message: `Scheduled calendar event: "${args.summary}"`, data: event };
+              } else {
+                const localEvent = { id: 'cal_' + Date.now(), summary: args.summary, start: { dateTime: args.start_time }, end: { dateTime: args.end_time } };
+                MOCK_DB.events.unshift(localEvent);
+                output = { success: true, message: `Calendar event prepared: "${args.summary}"`, data: localEvent };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "create_google_sheet") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const sheetRes = await createGoogleSpreadsheet(args.title, args.headers || [], args.rows || []);
+                MOCK_DB.sheets.unshift({ id: sheetRes.spreadsheetId, name: args.title, webViewLink: sheetRes.spreadsheetUrl });
+                output = { success: true, message: `Spreadsheet "${args.title}" created!`, data: sheetRes };
+              } else {
+                const localSheet = { id: 'sheet_' + Date.now(), name: args.title, headers: args.headers, rows: args.rows };
+                MOCK_DB.sheets.unshift(localSheet);
+                output = { success: true, message: `Spreadsheet drafted: "${args.title}"`, data: localSheet };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "create_meet_space") {
+            try {
+              const token = await getAccessToken();
+              if (token) {
+                const space = await createGoogleMeetSpace();
+                MOCK_DB.meet_spaces.unshift(space);
+                output = { success: true, message: `Google Meet space created: ${space.meetingUri || space.name}`, data: space };
+              } else {
+                const mockCode = `${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`;
+                const localSpace = { name: `spaces/${mockCode}`, meetingUri: `https://meet.google.com/${mockCode}` };
+                MOCK_DB.meet_spaces.unshift(localSpace);
+                output = { success: true, message: `Meet room created: ${localSpace.meetingUri}`, data: localSpace };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
+          } else if (call.name === "send_chat_message") {
+            try {
+              const token = await getAccessToken();
+              const args = (call.args || {}) as any;
+              if (token) {
+                const chatRes = await sendChatMessage(args.space_name, args.message_text);
+                output = { success: true, message: `Message sent to Chat`, data: chatRes };
+              } else {
+                const localChat = { name: `spaces/local/messages/${Date.now()}`, text: args.message_text, space: args.space_name };
+                MOCK_DB.chat_messages.unshift(localChat);
+                output = { success: true, message: `Message sent`, data: localChat };
+              }
+            } catch (err: any) {
+              output = { success: false, error: err.message };
+            }
           } else if (call.name === "start_ai_agent") {
             try {
               // Create an autonomous sub-agent call
@@ -1219,11 +1725,13 @@ console.log(MODEL_NAME)
           }
 
           
-          toolResults.push({
+          const record = {
             id: call.id, // Must match the call ID
             name: call.name,
             result: output
-          });
+          };
+          toolResults.push(record);
+          allToolOutputs.push(record);
         }
 
         // Send results back to model
@@ -1260,6 +1768,16 @@ console.log(MODEL_NAME)
     // Check if report or dashboard was generated during this turn
     const generatedReport = allToolCallRecords.some(t => t.name === "generate_yearly_report");
     const generatedDashboard = allToolCallRecords.some(t => t.name === "create_operations_dashboard");
+    const generatedForm = allToolCallRecords.find(t => t.name === "create_google_form");
+    const generatedEmail = allToolCallRecords.find(t => t.name === "send_gmail_email");
+    const generatedTask = allToolCallRecords.find(t => t.name === "create_google_task");
+    const generatedDoc = allToolCallRecords.find(t => t.name === "create_google_doc");
+    const generatedCalendar = allToolCallRecords.find(t => t.name === "schedule_calendar_event");
+    const generatedSheet = allToolCallRecords.find(t => t.name === "create_google_sheet");
+    const generatedMeet = allToolCallRecords.find(t => t.name === "create_meet_space");
+    const generatedChat = allToolCallRecords.find(t => t.name === "send_chat_message");
+    const generatedJev = allToolCallRecords.find(t => t.name === "jev_classify_issue");
+    const jevResultRecord = allToolOutputs.find(t => t.name === "jev_classify_issue");
 
     // Final response from model
     const modelMsg: ChatMessage = {
@@ -1269,7 +1787,17 @@ console.log(MODEL_NAME)
       groundingMetadata: result.candidates?.[0]?.groundingMetadata,
       latencyMs: performance.now() - totalStartTime,
       hasReport: generatedReport,
-      hasDashboard: generatedDashboard
+      hasDashboard: generatedDashboard,
+      hasForm: Boolean(generatedForm),
+      hasEmail: Boolean(generatedEmail),
+      hasTask: Boolean(generatedTask),
+      hasDoc: Boolean(generatedDoc),
+      hasCalendar: Boolean(generatedCalendar),
+      hasSheet: Boolean(generatedSheet),
+      hasMeet: Boolean(generatedMeet),
+      hasChat: Boolean(generatedChat),
+      hasJev: Boolean(generatedJev),
+      jevData: jevResultRecord?.result?.data,
     };
     currentHistory.push(modelMsg);
     

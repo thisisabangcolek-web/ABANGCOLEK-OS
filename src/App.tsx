@@ -20,15 +20,30 @@ import {
   FileText,
   Mail,
   CheckSquare,
-  FolderOpen
+  FolderOpen,
+  Calendar,
+  FileSpreadsheet,
+  MapPin,
+  Video,
+  MessageSquare,
+  Flame,
+  Plus,
+  AlertCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { sendMessageToAgentStream, ChatMessage, ToolCall, MOCK_DB, AgentStep } from '@/services/gemini';
+import { appStore, OrderItem } from '@/services/store';
+import { AbangColekDiscoveryView } from '@/components/AbangColekDiscoveryView';
 import { FormsView } from '@/components/FormsView';
 import { GmailView } from '@/components/GmailView';
 import { TasksView } from '@/components/TasksView';
 import { DocsView } from '@/components/DocsView';
+import { CalendarView } from '@/components/CalendarView';
+import { SheetsView } from '@/components/SheetsView';
+import { MapsView } from '@/components/MapsView';
+import { MeetView } from '@/components/MeetView';
+import { ChatWorkspaceView } from '@/components/ChatWorkspaceView';
 import { subscribeAuth } from '@/services/googleAuth';
 import { User as FbUser } from 'firebase/auth';
 
@@ -43,12 +58,21 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
     });
   }, []);
 
-  const menuItems = [
+  const workspaceItems = [
+    { id: 'discovery', label: 'Abang Colek Hub', icon: Flame, badge: 'v4.2' },
     { id: 'chat', label: 'Agent Chat', icon: Bot },
     { id: 'gmail', label: 'Gmail', icon: Mail },
-    { id: 'tasks', label: 'Google Tasks', icon: CheckSquare },
-    { id: 'docs', label: 'Google Docs', icon: FileText },
-    { id: 'forms', label: 'Google Forms', icon: FolderOpen, badge: googleUser ? 'Synced' : undefined },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { id: 'docs', label: 'Docs', icon: FileText },
+    { id: 'sheets', label: 'Sheets', icon: FileSpreadsheet },
+    { id: 'forms', label: 'Forms', icon: FolderOpen, badge: googleUser ? 'Synced' : undefined },
+    { id: 'meet', label: 'Meet', icon: Video },
+    { id: 'chat_workspace', label: 'Chat', icon: MessageSquare },
+    { id: 'maps', label: 'Logistics Map', icon: MapPin },
+  ];
+
+  const analyticsItems = [
     { id: 'dashboards', label: 'Dashboards', icon: Activity },
     { id: 'reports', label: 'Reports', icon: Search },
     { id: 'orders', label: 'Orders', icon: Database },
@@ -56,61 +80,92 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
   ];
 
   return (
-    <div className="hidden md:flex w-[280px] flex-col h-screen pt-8 pb-6 pl-8 pr-4">
-      <div className="mb-10 px-6 flex items-center">
-        <button onClick={() => window.location.reload()} className="text-2xl font-bold text-black tracking-tight text-left hover:opacity-70 transition-opacity">
-          Retail Agent Dashboard
+    <div className="hidden md:flex w-[280px] flex-col h-screen pt-7 pb-5 pl-7 pr-3 shrink-0">
+      <div className="mb-6 px-4 flex items-center">
+        <button onClick={() => window.location.reload()} className="text-xl font-bold text-black tracking-tight text-left hover:opacity-70 transition-opacity flex items-center gap-2">
+          <Flame size={20} className="text-red-600 fill-red-600" />
+          <span>ABANGCOLEK-OS</span>
         </button>
       </div>
       
-      <nav className="flex-1 space-y-1.5 pr-2">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "w-full flex items-center justify-between px-4 py-3 rounded-full text-[14px] font-medium transition-all",
-              activeTab === item.id 
-                ? "bg-black text-white shadow-sm" 
-                : "text-zinc-500 hover:bg-black/[0.04] hover:text-black"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <item.icon size={16} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-              <span>{item.label}</span>
-            </div>
-            {item.badge && (
-              <span className={cn(
-                "text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                activeTab === item.id 
-                  ? "bg-white/20 text-white" 
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-              )}>
-                {item.badge}
-              </span>
-            )}
-          </button>
-        ))}
+      <nav className="flex-1 space-y-4 pr-1 overflow-y-auto min-h-0 text-[13px]">
+        <div>
+          <p className="px-4 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Workspace & AI</p>
+          <div className="space-y-1">
+            {workspaceItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3.5 py-2.5 rounded-full font-medium transition-all text-left",
+                  activeTab === item.id 
+                    ? "bg-black text-white shadow-sm" 
+                    : "text-zinc-600 hover:bg-black/[0.04] hover:text-black"
+                )}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <item.icon size={15} strokeWidth={activeTab === item.id ? 2.5 : 2} className="shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className={cn(
+                    "text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0",
+                    activeTab === item.id 
+                      ? "bg-white/20 text-white" 
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                  )}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="px-4 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Operations & Data</p>
+          <div className="space-y-1">
+            {analyticsItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3.5 py-2.5 rounded-full font-medium transition-all text-left",
+                  activeTab === item.id 
+                    ? "bg-black text-white shadow-sm" 
+                    : "text-zinc-600 hover:bg-black/[0.04] hover:text-black"
+                )}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <item.icon size={15} strokeWidth={activeTab === item.id ? 2.5 : 2} className="shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
 
-      {/* Google Forms Connection Pill in Sidebar Footer */}
-      <div className="pr-2 pt-4 border-t border-black/[0.04]">
+      {/* Google Workspace Connection Pill in Sidebar Footer */}
+      <div className="pr-1 pt-3 border-t border-black/[0.04] shrink-0">
         <button
-          onClick={() => setActiveTab('forms')}
-          className="w-full text-left p-3 rounded-2xl bg-white border border-black/[0.04] hover:border-purple-200 transition-all shadow-xs group"
+          onClick={() => setActiveTab('gmail')}
+          className="w-full text-left p-3 rounded-2xl bg-white border border-black/[0.04] hover:border-black/20 transition-all shadow-xs group"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
-              <FileText size={13} className="text-purple-600" />
-              Google Forms API
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Google Workspace
             </span>
             <span className={cn(
-              "w-2 h-2 rounded-full",
-              googleUser ? "bg-emerald-500" : "bg-zinc-300"
-            )} />
+              "text-[10px] font-medium px-2 py-0.5 rounded-full",
+              googleUser ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"
+            )}>
+              {googleUser ? 'Connected' : 'Offline Mode'}
+            </span>
           </div>
           <p className="text-[10px] text-zinc-400 mt-1 line-clamp-1">
-            {googleUser ? (googleUser.displayName || googleUser.email) : 'Connect with Google'}
+            {googleUser ? (googleUser.displayName || googleUser.email) : 'Sign in on any tab'}
           </p>
         </button>
       </div>
@@ -261,23 +316,35 @@ const ChatInterface = ({
               <div className="w-16 h-16 bg-white shadow-sm border border-black/5 rounded-full flex items-center justify-center">
                 <Bot size={32} className="text-zinc-300" />
               </div>
-              <p className="font-medium text-zinc-500">How can I help you today?</p>
-              <div className="flex flex-wrap justify-center gap-2.5 w-full max-w-xl">
-                <button onClick={() => onSendMessage("Draft a customer service refund email in Gmail for delayed order #38290")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-red-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+              <p className="font-medium text-zinc-500">Bagaimana saya boleh bantu operasi Abang Colek hari ini?</p>
+              <div className="flex flex-wrap justify-center gap-2 w-full max-w-2xl">
+                <button onClick={() => onSendMessage("Siasat aduan pembungkusan botol kuah colek bocor (LEAKAGE) dan draf emel gantian di Gmail")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-red-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
                   <Mail size={13} className="text-red-600" />
-                  Draft Email in Gmail
+                  Aduan Botol Bocor (Gmail)
                 </button>
-                <button onClick={() => onSendMessage("Create an operational investigation task in Google Tasks for São Paulo carrier delay")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-blue-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                <button onClick={() => onSendMessage("Jadualkan sesi taklimat stokis Terengganu & selatan dalam Google Calendar")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-amber-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Calendar size={13} className="text-amber-600" />
+                  Jadual Mesyuarat Stokis
+                </button>
+                <button onClick={() => onSendMessage("Eksport rekod jualan kuah colek dan botol pakej ejen ke Google Sheets")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-emerald-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <FileSpreadsheet size={13} className="text-emerald-600" />
+                  Eksport Stokis (Sheets)
+                </button>
+                <button onClick={() => onSendMessage("Cipta tugasan pemeriksaan QC penutup botol kuah colek pembekal di Google Tasks")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-blue-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
                   <CheckSquare size={13} className="text-blue-600" />
-                  Add Google Task
+                  Tugasan QC Botol (Tasks)
                 </button>
-                <button onClick={() => onSendMessage("Create a standard operating procedure document in Google Docs for customer return disputes")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-indigo-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                <button onClick={() => onSendMessage("Cipta SOP kawalan kualiti kuah colek & pembungkusan di Google Docs")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-indigo-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
                   <FileText size={13} className="text-indigo-600" />
-                  Create SOP in Google Docs
+                  SOP Kuah Colek (Docs)
                 </button>
-                <button onClick={() => onSendMessage("Create a customer satisfaction Google Form for delayed deliveries")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-purple-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                <button onClick={() => onSendMessage("Bina borang Google Forms untuk pendaftaran ejen & stokis baharu Abang Colek")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-purple-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
                   <FolderOpen size={13} className="text-purple-600" />
-                  Create CSAT Google Form
+                  Borang Ejen (Forms)
+                </button>
+                <button onClick={() => onSendMessage("Buka bilik Google Meet untuk krew festival jualan pop-up Johor Bahru")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-teal-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Video size={13} className="text-teal-600" />
+                  Bilik Krew Pop-Up (Meet)
                 </button>
               </div>
             </div>
@@ -304,11 +371,11 @@ const ChatInterface = ({
                 "rounded-3xl text-[14px] leading-relaxed max-w-[85%] font-medium",
                 msg.role === 'user' 
                   ? "p-5 bg-black text-white rounded-br-[8px]" 
-                  : msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc
+                  : (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat)
                     ? "p-0" 
                     : "p-5 bg-white rounded-bl-[8px] text-zinc-800 border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
               )}>
-                {msg.role === 'model' && (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc) ? (
+                {msg.role === 'model' && (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat) ? (
                   <div className="flex flex-col gap-3 min-w-[220px]">
                     <div className="p-4 bg-white border border-black/5 rounded-3xl rounded-bl-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex flex-col gap-2.5">
                       <span className="font-semibold text-[14px] text-zinc-900 flex items-center gap-2">
@@ -316,6 +383,16 @@ const ChatInterface = ({
                           <>
                             <Mail size={16} className="text-red-600" />
                             Email Delivered via Gmail
+                          </>
+                        ) : msg.hasCalendar ? (
+                          <>
+                            <Calendar size={16} className="text-amber-600" />
+                            Event Scheduled in Google Calendar
+                          </>
+                        ) : msg.hasSheet ? (
+                          <>
+                            <FileSpreadsheet size={16} className="text-emerald-600" />
+                            Spreadsheet Created in Google Sheets
                           </>
                         ) : msg.hasTask ? (
                           <>
@@ -331,6 +408,16 @@ const ChatInterface = ({
                           <>
                             <FolderOpen size={16} className="text-purple-600" />
                             Google Form Created & Published
+                          </>
+                        ) : msg.hasMeet ? (
+                          <>
+                            <Video size={16} className="text-teal-600" />
+                            Google Meet Room Created
+                          </>
+                        ) : msg.hasChat ? (
+                          <>
+                            <MessageSquare size={16} className="text-blue-600" />
+                            Message Sent to Google Chat
                           </>
                         ) : msg.hasReport && msg.hasDashboard ? (
                           'Report & Dashboard ready'
@@ -372,6 +459,24 @@ const ChatInterface = ({
                           Open in Gmail &rarr;
                         </button>
                       )}
+                      {msg.hasCalendar && (
+                        <button 
+                          onClick={() => setActiveTab('calendar')}
+                          className="bg-amber-600 text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-amber-700 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <Calendar size={14} />
+                          Open in Calendar &rarr;
+                        </button>
+                      )}
+                      {msg.hasSheet && (
+                        <button 
+                          onClick={() => setActiveTab('sheets')}
+                          className="bg-emerald-600 text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-emerald-700 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <FileSpreadsheet size={14} />
+                          Open in Sheets &rarr;
+                        </button>
+                      )}
                       {msg.hasTask && (
                         <button 
                           onClick={() => setActiveTab('tasks')}
@@ -399,6 +504,24 @@ const ChatInterface = ({
                           View in Google Forms Tab &rarr;
                         </button>
                       )}
+                      {msg.hasMeet && (
+                        <button 
+                          onClick={() => setActiveTab('meet')}
+                          className="bg-teal-600 text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-teal-700 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <Video size={14} />
+                          Open Google Meet &rarr;
+                        </button>
+                      )}
+                      {msg.hasChat && (
+                        <button 
+                          onClick={() => setActiveTab('chat_workspace')}
+                          className="bg-blue-600 text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-blue-700 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <MessageSquare size={14} />
+                          Open Google Chat &rarr;
+                        </button>
+                      )}
                       {msg.hasReport && (
                         <button 
                           onClick={() => setActiveTab('reports')}
@@ -413,6 +536,15 @@ const ChatInterface = ({
                           className="bg-black text-white px-6 py-3 rounded-full font-medium w-max hover:bg-zinc-800 transition-colors text-[13px] shadow-sm flex items-center gap-2"
                         >
                           go to dashboards &rarr;
+                        </button>
+                      )}
+                      {msg.hasJev && (
+                        <button 
+                          onClick={() => setActiveTab('discovery')}
+                          className="bg-red-600 text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-red-700 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <Flame size={14} />
+                          Buka Hab JEV Abang Colek &rarr;
                         </button>
                       )}
                     </div>
@@ -552,14 +684,14 @@ const ChatInterface = ({
 
           {history.length > 0 && (
             <div className="flex flex-wrap justify-center gap-2 mt-4 w-full">
-              <button onClick={() => onSendMessage("Write a report about sales in São Paulo in 2017.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-600 font-medium text-[12px]">
-              Write a report about sales in São Paulo in 2017
+              <button onClick={() => onSendMessage("Siasat aduan penutup botol kuah colek bocor (LEAKAGE) di Terengganu menggunakan JEV System-1.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-red-600 font-medium text-[12px]">
+                Siasat Aduan Botol Bocor (JEV)
               </button>
-              <button onClick={() => onSendMessage("Create a dashboard about our key markets")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-600 font-medium text-[12px]">
-                Create a dashboard about our key markets
+              <button onClick={() => onSendMessage("Cipta dashboard operasi jualan mengikut bandar (Johor Bahru, Shah Alam, Terengganu, Bangi).")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-700 font-medium text-[12px]">
+                Dashboard Jualan Hab Malaysia
               </button>
-              <button onClick={() => onSendMessage("Find the latest 1-star review and refund the order.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-600 font-medium text-[12px]">
-              Find latest 1-star review & refund 
+              <button onClick={() => onSendMessage("Cari pesanan bermasalah di Terengganu dan luluskan bayaran balik RM35 segera.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-emerald-700 font-medium text-[12px]">
+                Luluskan Bayaran Balik RM (Live)
               </button>
             </div>
           )}
@@ -570,65 +702,196 @@ const ChatInterface = ({
 };
 
 const OrdersView = ({ onAction }: { onAction: (msg?: string) => void }) => {
+  const [orders, setOrders] = useState<OrderItem[]>(appStore.getOrders());
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newCust, setNewCust] = useState("");
+  const [newCity, setNewCity] = useState("johor bahru");
+  const [newItems, setNewItems] = useState("3x Kuah Colek Buah Original (500g)");
+  const [newAmount, setNewAmount] = useState("45");
+
+  useEffect(() => {
+    return appStore.subscribe(() => {
+      setOrders(appStore.getOrders());
+    });
+  }, []);
+
+  const handleAddOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCust.trim()) return;
+    appStore.addOrder({
+      customer_id: newCust.trim(),
+      city: newCity,
+      items: newItems,
+      amount: parseFloat(newAmount) || 0,
+      status: 'Processing'
+    });
+    setNewCust("");
+    setShowAddModal(false);
+  };
+
+  const handleRefund = (orderId: string, amount: number) => {
+    appStore.issueRefund(orderId, amount, 'LEAKAGE / Kerosakan Botol');
+  };
+
   return (
-  <div className="p-4 md:p-8 h-full overflow-y-auto">
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-end mb-8 pl-2">
-        <div>
-          <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Order Database</h2>
-          <p className="text-zinc-500 mt-1 text-[15px] font-medium">Manage and monitor all recent orders.</p>
-        </div>
-      </div>
-      
-      <div className="grid gap-4">
-        {MOCK_DB.orders.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.04]">
-            <p className="text-zinc-400 font-medium">No orders found.</p>
+    <div className="p-4 md:p-8 h-full overflow-y-auto">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-4 pl-2">
+          <div>
+            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Pangkalan Data Pesanan Sebenar</h2>
+            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Urus dan pantau pesanan pelanggan serta stokis Abang Colek.</p>
           </div>
-        ) : (
-          MOCK_DB.orders.map((order, i) => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex justify-between items-center transition-all hover:border-black/10">
+          <button 
+            onClick={() => setShowAddModal(true)} 
+            className="px-5 py-2.5 bg-black hover:bg-zinc-800 text-white rounded-full text-[13px] font-medium transition-all shadow-sm flex items-center gap-2 cursor-pointer w-max"
+          >
+            <Plus size={15} />
+            <span>+ Tambah Pesanan Baharu</span>
+          </button>
+        </div>
+
+        {/* Add Order Modal */}
+        {showAddModal && (
+          <div className="p-6 bg-white rounded-3xl border border-black/10 shadow-md space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-base text-zinc-900">Daftar Pesanan Baharu (Storan Sebenar)</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-xs font-semibold text-zinc-400 hover:text-zinc-700">Tutup</button>
+            </div>
+            <form onSubmit={handleAddOrder} className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-lg text-zinc-900">{order.order_id}</h3>
-                  <span className="px-3 py-1 bg-zinc-50 rounded-full text-xs font-medium text-zinc-600 border border-black/5">{order.city}</span>
-                </div>
-                <div className="mt-4 flex gap-8 text-sm text-zinc-600">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider mb-1">Customer</span>
-                    <strong className="text-zinc-900 text-[15px] font-semibold">{order.customer_id}</strong>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider mb-1">Amount</span>
-                    <strong className="text-emerald-600 text-[15px] font-semibold">${order.amount.toLocaleString()}</strong>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider mb-1">Date</span>
-                    <strong className="text-zinc-600 text-[15px] font-semibold">{new Date(order.date).toLocaleDateString()}</strong>
-                  </div>
-                  {order.delivered_date && (
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider mb-1">Delivered On</span>
-                      <strong className="text-zinc-900 text-[15px] font-semibold">{new Date(order.delivered_date).toLocaleDateString()}</strong>
-                    </div>
-                  )}
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Nama / ID Pelanggan</label>
+                <input 
+                  type="text" 
+                  value={newCust} 
+                  onChange={(e) => setNewCust(e.target.value)} 
+                  placeholder="cth: Pn. Siti (Shah Alam)"
+                  required
+                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Bandar / Hab</label>
+                <select 
+                  value={newCity} 
+                  onChange={(e) => setNewCity(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium capitalize"
+                >
+                  <option value="johor bahru">Johor Bahru (HQ/Toppen)</option>
+                  <option value="shah alam">Shah Alam (Central Hub)</option>
+                  <option value="kuala terengganu">Kuala Terengganu (Stokis)</option>
+                  <option value="bangi">Bangi</option>
+                  <option value="kota bharu">Kota Bharu</option>
+                  <option value="penang">Penang</option>
+                  <option value="melaka">Melaka</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Item Produk</label>
+                <input 
+                  type="text" 
+                  value={newItems} 
+                  onChange={(e) => setNewItems(e.target.value)} 
+                  placeholder="cth: 3x Kuah Colek Buah Original"
+                  required
+                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Jumlah (RM)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    value={newAmount} 
+                    onChange={(e) => setNewAmount(e.target.value)} 
+                    required
+                    className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
+                  />
+                  <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shrink-0 cursor-pointer">
+                    Simpan
+                  </button>
                 </div>
               </div>
-              <span className={cn(
-                "px-4 py-1.5 text-xs font-medium rounded-full border",
-                order.status === 'Delivered' ? "bg-emerald-50 border-emerald-200 text-emerald-700" : 
-                order.status === 'Delayed' ? "bg-red-50 border-red-200 text-red-700" :
-                order.status === 'Refunded' ? "bg-zinc-100 border-black/10 text-zinc-600" :
-                "bg-white border-black/10 text-zinc-900"
-              )}>
-                {order.status}
-              </span>
-            </div>
-          ))
+            </form>
+          </div>
         )}
+        
+        <div className="grid gap-4">
+          {orders.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.04]">
+              <p className="text-zinc-400 font-medium">Tiada pesanan direkodkan.</p>
+            </div>
+          ) : (
+            orders.map((order, i) => (
+              <div key={order.order_id || i} className="bg-white p-6 rounded-3xl border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-black/10">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-lg text-zinc-900">{order.order_id}</h3>
+                    <span className="px-3 py-1 bg-zinc-50 rounded-full text-xs font-semibold text-zinc-700 border border-black/5 capitalize">{order.city}</span>
+                    <span className={cn(
+                      "px-3 py-0.5 text-xs font-bold rounded-full border",
+                      order.status === 'Delivered' ? "bg-emerald-50 border-emerald-200 text-emerald-700" : 
+                      order.status === 'Delayed' ? "bg-red-50 border-red-200 text-red-700" :
+                      order.status === 'Refunded' ? "bg-zinc-100 border-black/10 text-zinc-600" :
+                      "bg-blue-50 border-blue-200 text-blue-700"
+                    )}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs font-medium text-zinc-600">
+                    <strong className="text-zinc-900">Produk:</strong> {order.items}
+                  </p>
+
+                  {order.refund_reason && (
+                    <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 p-2 rounded-xl border border-amber-100">
+                      {order.refund_reason}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-6 text-sm text-zinc-600 pt-1">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Pelanggan</span>
+                      <strong className="text-zinc-900 text-sm font-semibold">{order.customer_id}</strong>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Jumlah</span>
+                      <strong className="text-emerald-700 text-sm font-bold">RM {order.amount.toLocaleString()}</strong>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Tarikh</span>
+                      <strong className="text-zinc-600 text-sm font-medium">{new Date(order.date).toLocaleDateString()}</strong>
+                    </div>
+                    {order.delivered_date && (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Diterima Pada</span>
+                        <strong className="text-zinc-900 text-sm font-medium">{new Date(order.delivered_date).toLocaleDateString()}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {order.status !== 'Refunded' && (
+                    <button 
+                      onClick={() => handleRefund(order.order_id, order.amount)}
+                      className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-semibold transition-all cursor-pointer"
+                    >
+                      Bayar Balik (RM {order.amount})
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => onAction && onAction(`Siasat status pesanan ${order.order_id} bagi pelanggan ${order.customer_id} di ${order.city} menggunakan JEV System-1.`)}
+                    className="px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-full text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Semak di Chat &rarr;
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
-  </div>
   );
 };
 
@@ -638,8 +901,8 @@ const ReviewsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-end mb-8 pl-2">
         <div>
-          <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Customer Reviews</h2>
-          <p className="text-zinc-500 mt-1 text-[15px] font-medium">Monitor and manage customer feedback.</p>
+          <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Maklum Balas & Ulasan Pelanggan</h2>
+          <p className="text-zinc-500 mt-1 text-[15px] font-medium">Pantau ulasan kuah colek, aduan kebocoran penutup botol, dan klasifikasi JEV System-1.</p>
         </div>
       </div>
 
@@ -649,35 +912,62 @@ const ReviewsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
             <p className="text-zinc-400 font-medium">No reviews found.</p>
           </div>
         ) : (
-          MOCK_DB.reviews?.map((review, i) => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex justify-between items-start transition-all hover:border-black/10">
-              <div className="flex gap-5 max-w-[80%]">
-                <div className="w-12 h-12 bg-zinc-50 rounded-full flex items-center justify-center border border-black/5 shrink-0 mt-1">
-                  <User className="text-zinc-400" size={18} />
+          MOCK_DB.reviews?.map((review, i) => {
+            const order = appStore.getOrders().find(o => o.order_id === review.order_id);
+            const customerName = order?.customer_id || `Pelanggan #${review.order_id}`;
+            const reviewText = review.comment_message;
+            const reviewDate = review.creation_date;
+
+            return (
+              <div key={review.review_id || i} className="bg-white p-6 rounded-3xl border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex justify-between items-start transition-all hover:border-black/10">
+                <div className="flex gap-5 max-w-[80%]">
+                  <div className="w-12 h-12 bg-zinc-50 rounded-full flex items-center justify-center border border-black/5 shrink-0 mt-1">
+                    <User className="text-zinc-400" size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-[17px] text-zinc-900">{customerName}</span>
+                      <span className="text-[12px] text-zinc-400">•</span>
+                      <span className="text-[13px] text-zinc-500 font-medium">{new Date(reviewDate).toLocaleDateString()}</span>
+                      {review.issue_class && (
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                          review.issue_class === 'PRAISE' ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                        )}>
+                          {review.issue_class}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 mb-3">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Sparkles key={star} size={14} className={star <= review.score ? "text-yellow-400 fill-yellow-400" : "text-zinc-200"} />
+                      ))}
+                    </div>
+                    <p className="text-zinc-700 text-[15px] leading-relaxed mb-3">"{reviewText}"</p>
+                    <div className="flex gap-4 text-[12px] font-medium">
+                      <span className="flex items-center gap-1.5 text-zinc-500 bg-zinc-50 px-3 py-1 rounded-full border border-black/5">Order: <strong className="text-zinc-800">{review.order_id}</strong></span>
+                      <span className="flex items-center gap-1.5 text-zinc-500 bg-zinc-50 px-3 py-1 rounded-full border border-black/5">Category: <strong className="text-zinc-800 capitalize">{review.product_category}</strong></span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-[17px] text-zinc-900">{review.customer_id}</span>
-                    <span className="text-[12px] text-zinc-400">•</span>
-                    <span className="text-[13px] text-zinc-500 font-medium">{new Date(review.date).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex gap-1 mb-3">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <Sparkles key={star} size={14} className={star <= review.score ? "text-yellow-400 fill-yellow-400" : "text-zinc-200"} />
-                    ))}
-                  </div>
-                  <p className="text-zinc-700 text-[15px] leading-relaxed mb-3">"{review.text}"</p>
-                  <div className="flex gap-4 text-[12px] font-medium">
-                    <span className="flex items-center gap-1.5 text-zinc-500 bg-zinc-50 px-3 py-1 rounded-full border border-black/5">Order: <strong className="text-zinc-800">{review.order_id}</strong></span>
-                    <span className="flex items-center gap-1.5 text-zinc-500 bg-zinc-50 px-3 py-1 rounded-full border border-black/5">Category: <strong className="text-zinc-800 capitalize">{review.product_category}</strong></span>
-                  </div>
+                <div className="flex flex-col gap-2 shrink-0">
+                  <button 
+                    onClick={() => onAction(`Nilaikan maklum balas pelanggan ini menggunakan JEV System-1: "${reviewText}" dan tentukan tindakan operasi.`)} 
+                    className="px-4 py-2 text-[12px] font-semibold rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Flame size={13} />
+                    <span>JEV Triage</span>
+                  </button>
+                  <button 
+                    onClick={() => onAction(`Draf respons pelanggan di Gmail untuk ulasan ${review.review_id} bagi pesanan ${review.order_id}.`)} 
+                    className="px-4 py-1.5 text-[11px] font-medium rounded-full bg-white border border-black/10 text-zinc-600 hover:text-black hover:border-black/20 transition-colors"
+                  >
+                    Draf Emel
+                  </button>
                 </div>
               </div>
-              <button onClick={() => onAction(`Draft a customer response for review ${review.review_id} from ${review.customer_id}. Offer a solution.`)} className="px-4 py-2 text-[12px] font-medium rounded-full bg-white border border-black/10 text-zinc-600 hover:text-black hover:border-black/20 transition-colors">
-                Draft Response
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -687,7 +977,7 @@ const ReviewsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
 
 const ReportsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
   const handleGenerateReport = () => {
-    onAction();
+    onAction("Jana laporan tahunan terperinci prestasi jualan Kuah Colek Buah Abang Colek bagi tahun 2026.");
   };
 
   return (
@@ -695,18 +985,18 @@ const ReportsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex justify-between items-end mb-8 pl-2">
           <div>
-            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Reports</h2>
-            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Insights and summaries generated by AI.</p>
+            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Laporan Analisis Perniagaan</h2>
+            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Laporan eksekutif operasi yang dijana secara automatik.</p>
           </div>
-          <button onClick={handleGenerateReport} className="px-5 py-2.5 bg-black text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors">
-            + Generate report
+          <button onClick={handleGenerateReport} className="px-5 py-2.5 bg-black text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors cursor-pointer">
+            + Jana Laporan AI
           </button>
         </div>
 
         <div className="grid gap-6">
           {MOCK_DB.reports.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.04]">
-              <p className="text-zinc-400 font-medium">No reports generated yet. Ask the agent to generate a performance report.</p>
+              <p className="text-zinc-400 font-medium">Belum ada laporan dijana. Minta ejen menjana laporan prestasi.</p>
             </div>
           ) : (
             [...MOCK_DB.reports].reverse().map((report, i) => (
@@ -728,7 +1018,7 @@ const ReportsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
                             <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider block mb-2">{m.label}</span>
                             <div className="flex items-end gap-3">
                               <span className="text-[28px] font-semibold text-zinc-900 tracking-tight leading-none">
-                                {m.label.toLowerCase().includes('revenue') || m.label.toLowerCase().includes('value') || m.label.toLowerCase().includes('price') || m.label.toLowerCase().includes('cost') || m.label.toLowerCase().includes('amount') ? '$' : ''}
+                                {m.label.toLowerCase().includes('revenue') || m.label.toLowerCase().includes('value') || m.label.toLowerCase().includes('price') || m.label.toLowerCase().includes('cost') || m.label.toLowerCase().includes('amount') ? 'RM ' : ''}
                                 {m.value?.toLocaleString() || 0}
                               </span>
                               {m.trend && m.trend !== 'N/A' && m.trend !== 'n/a' && (
@@ -798,7 +1088,7 @@ const ReportsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
 
 const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
   const handleGenerateDashboard = () => {
-    onAction();
+    onAction("Bina dashboard analitik visual operasi Abang Colek merangkumi prestasi jualan hab utama (Johor Bahru, Shah Alam, Terengganu, Bangi), taburan isu botol bocor, dan KPI krew pop-up.");
   };
 
   return (
@@ -806,11 +1096,11 @@ const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex justify-between items-end mb-8 pl-2">
           <div>
-            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Dashboards</h2>
-            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Visual metrics and sales performance.</p>
+            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Papan Pemuka Analitik Operasi</h2>
+            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Metrik visual jualan hab, pecahan produk, dan status kualiti botol.</p>
           </div>
-          <button onClick={handleGenerateDashboard} className="px-5 py-2.5 bg-black text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors">
-            + Create dashboard
+          <button onClick={handleGenerateDashboard} className="px-5 py-2.5 bg-black text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors cursor-pointer">
+            + Bina Dashboard AI
           </button>
         </div>
 
@@ -932,28 +1222,31 @@ const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
 
 const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
   const menuItems = [
+    { id: 'discovery', label: 'Discovery', icon: Flame },
     { id: 'chat', label: 'Chat', icon: Bot },
     { id: 'gmail', label: 'Gmail', icon: Mail },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    { id: 'docs', label: 'Docs', icon: FileText },
+    { id: 'sheets', label: 'Sheets', icon: FileSpreadsheet },
     { id: 'forms', label: 'Forms', icon: FolderOpen },
+    { id: 'maps', label: 'Map', icon: MapPin },
     { id: 'dashboards', label: 'Stats', icon: Activity },
   ];
 
   return (
-    <div className="md:hidden flex items-center justify-around bg-white border-t border-black/5 px-2 py-3 shrink-0 pb-safe">
+    <div className="md:hidden flex items-center justify-around bg-white border-t border-black/5 px-2 py-2.5 shrink-0 pb-safe overflow-x-auto">
       {menuItems.map((item) => (
         <button
           key={item.id}
           onClick={() => setActiveTab(item.id)}
           className={cn(
-            "flex flex-col items-center gap-1 p-2 rounded-xl transition-all",
+            "flex flex-col items-center gap-1 px-2.5 py-1 rounded-xl transition-all shrink-0",
             activeTab === item.id 
-              ? "text-black" 
+              ? "text-black font-semibold" 
               : "text-zinc-400 hover:text-zinc-600"
           )}
         >
-          <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+          <item.icon size={18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
           <span className="text-[10px] font-medium">{item.label}</span>
         </button>
       ))}
@@ -962,7 +1255,7 @@ const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTa
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('discovery');
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTool, setCurrentTool] = useState<ToolCall | null>(null);
@@ -1004,13 +1297,15 @@ export default function App() {
       
       {/* Mobile Header */}
       <div className="md:hidden flex items-center px-6 pt-6 pb-2 shrink-0">
-        <button onClick={() => window.location.reload()} className="text-2xl font-bold text-black tracking-tight text-left hover:opacity-70 transition-opacity">
-          Retail Agent Dashboard
+        <button onClick={() => window.location.reload()} className="text-2xl font-bold text-black tracking-tight text-left hover:opacity-70 transition-opacity flex items-center gap-2">
+          <Flame size={24} className="text-red-600 fill-red-600" />
+          <span>ABANGCOLEK-OS</span>
         </button>
       </div>
 
       <main className="flex-1 flex flex-col overflow-hidden relative px-4 pb-4 pt-2 md:pt-6 md:pb-6 md:pr-6 md:pl-2">
         <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden relative">
+          {activeTab === 'discovery' && <AbangColekDiscoveryView onAction={handleAction} />}
           {activeTab === 'chat' && (
             <ChatInterface 
               history={history} 
@@ -1023,9 +1318,14 @@ export default function App() {
             />
           )}
           {activeTab === 'gmail' && <GmailView onAction={handleAction} />}
+          {activeTab === 'calendar' && <CalendarView onAction={handleAction} />}
           {activeTab === 'tasks' && <TasksView onAction={handleAction} />}
           {activeTab === 'docs' && <DocsView onAction={handleAction} />}
+          {activeTab === 'sheets' && <SheetsView onAction={handleAction} />}
           {activeTab === 'forms' && <FormsView onAction={handleAction} />}
+          {activeTab === 'meet' && <MeetView onAction={handleAction} />}
+          {activeTab === 'chat_workspace' && <ChatWorkspaceView onAction={handleAction} />}
+          {activeTab === 'maps' && <MapsView onAction={handleAction} />}
           {activeTab === 'orders' && <OrdersView onAction={handleAction} />}
           {activeTab === 'reviews' && <ReviewsView onAction={handleAction} />}
           {activeTab === 'reports' && <ReportsView onAction={handleAction} />}
@@ -1033,7 +1333,7 @@ export default function App() {
         </div>
         
         <div className="mt-4 px-4 text-[11px] text-zinc-400 text-center md:text-right shrink-0">
-          Data via <a href="https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce" target="_blank" className="underline hover:text-zinc-600 font-medium">Olist E-Commerce Dataset</a>
+          Intelligence & Discovery via <a href="https://github.com/thisisabangcolek-web/Abang-Colek.git" target="_blank" className="underline hover:text-zinc-600 font-medium">ABANGCOLEK Discovery Engine (v4.2.0)</a>
         </div>
       </main>
 

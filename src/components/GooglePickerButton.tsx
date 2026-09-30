@@ -11,6 +11,7 @@ import { getAccessToken } from '@/services/googleAuth';
 
 interface GooglePickerButtonProps {
   onPicked: (file: PickedFile) => void;
+  onError?: (msg: string) => void;
   className?: string;
   label?: string;
   viewId?: string;
@@ -19,6 +20,7 @@ interface GooglePickerButtonProps {
 
 export const GooglePickerButton: React.FC<GooglePickerButtonProps> = ({
   onPicked,
+  onError,
   className,
   label = "Google Picker",
   viewId = "DOCS",
@@ -29,7 +31,11 @@ export const GooglePickerButton: React.FC<GooglePickerButtonProps> = ({
   const handleClick = async () => {
     const token = await getAccessToken();
     if (!token) {
-      alert("Please sign in with Google first to browse your Google Drive files.");
+      if (onError) {
+        onError("Please sign in with Google first to browse your Google Drive files.");
+      } else {
+        console.warn("Please sign in with Google first to browse your Google Drive files.");
+      }
       return;
     }
     setIsOpen(true);
@@ -45,8 +51,11 @@ export const GooglePickerButton: React.FC<GooglePickerButtonProps> = ({
           setIsOpen(false);
         }
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Picker error:", err);
+      if (onError) {
+        onError(err?.message || "Failed to launch Google Picker");
+      }
       setIsOpen(false);
     }
   };

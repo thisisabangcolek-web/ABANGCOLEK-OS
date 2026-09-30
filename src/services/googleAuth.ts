@@ -40,6 +40,18 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/tasks.readonly',
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/documents.readonly',
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/spreadsheets.readonly',
+  'https://www.googleapis.com/auth/meetings.space.created',
+  'https://www.googleapis.com/auth/meetings.space.readonly',
+  'https://www.googleapis.com/auth/chat.spaces',
+  'https://www.googleapis.com/auth/chat.spaces.readonly',
+  'https://www.googleapis.com/auth/chat.messages',
+  'https://www.googleapis.com/auth/chat.messages.create',
+  'https://www.googleapis.com/auth/chat.messages.readonly',
 ];
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);

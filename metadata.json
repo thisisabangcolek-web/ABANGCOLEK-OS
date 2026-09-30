@@ -1,6 +1,6 @@
 {
   "name": "ABANGCOLEK-OS",
-  "description": "A agent that plans and executes multi-step tasks, adaptable to a wide range of real-world workflows.",
+  "description": "AI agent and operations suite with Gmail, Google Calendar, Sheets, Docs, Tasks, Forms, Meet, Chat, and Google Maps Platform integration.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
