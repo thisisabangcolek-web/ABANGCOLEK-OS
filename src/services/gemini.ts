@@ -21,6 +21,20 @@ import { createGoogleMeetSpace } from './googleMeet';
 import { sendChatMessage, listChatSpaces } from './googleChat';
 import { evaluateWithJev, JevClassificationResult } from './jevEngine';
 import { appStore } from './store';
+import {
+  executeSkyscannerSearch,
+  executeBookingSearch,
+  executeCanvaDesign,
+  executeAdobeProcess,
+  executeGitHubManage,
+  executeVercelStatus,
+  executeSupabaseQuery,
+  executeMixpanelAnalytics,
+  executeCorosMetrics,
+  executeAppleHealthSummary,
+  executeGoogleDriveSearch
+} from './pluginExecutors';
+import { pluginManager } from './pluginService';
 
 // Initialize Gemini Client
 // We use the recommended 'gemini-3.8-flash' model
@@ -52,6 +66,9 @@ export interface ChatMessage extends Content {
   chatData?: any;
   hasJev?: boolean;
   jevData?: JevClassificationResult;
+  hasPlugin?: boolean;
+  pluginType?: string;
+  pluginData?: any;
 }
 
 export interface ToolCall {
@@ -64,6 +81,26 @@ export interface ToolResult {
   id: string;
   name: string;
   result: any;
+}
+
+export type ToolExecutionListener = (isExecuting: boolean, toolName?: string) => void;
+const toolExecutionListeners = new Set<ToolExecutionListener>();
+
+export function subscribeToolExecution(callback: ToolExecutionListener): () => void {
+  toolExecutionListeners.add(callback);
+  return () => {
+    toolExecutionListeners.delete(callback);
+  };
+}
+
+export function notifyToolExecution(isExecuting: boolean, toolName?: string): void {
+  toolExecutionListeners.forEach(listener => {
+    try {
+      listener(isExecuting, toolName);
+    } catch (e) {
+      console.error("Error in toolExecutionListener", e);
+    }
+  });
 }
 
 // Live Persistent Database for the agent to interact with (Abang Colek & Workspace data)
@@ -530,6 +567,134 @@ export const tools = [
           },
           required: ["space_name", "message_text"]
         }
+      },
+      // --- 3P Plugins Ecosystem ---
+      {
+        name: "skyscanner_search_flights",
+        description: "PLUGIN (Skyscanner): Search cheap flights, airfares, airlines (Malaysia Airlines, AirAsia, ANA, etc.), schedules and ticket prices (MYR).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            origin: { type: Type.STRING, description: "Origin city or airport code (e.g., 'KUL', 'JHB', 'Kuala Lumpur')" },
+            destination: { type: Type.STRING, description: "Destination city or airport code (e.g., 'Tokyo', 'Terengganu', 'Kota Kinabalu', 'London')" },
+            depart_date: { type: Type.STRING, description: "Optional departure date (e.g., 'next week', '2026-10-15')" },
+            passengers: { type: Type.NUMBER, description: "Number of passengers" }
+          },
+          required: ["destination"]
+        }
+      },
+      {
+        name: "booking_search_hotels",
+        description: "PLUGIN (Booking.com): Search and book hotels, homestays, room rates (MYR), review scores, and amenities across cities.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            destination: { type: Type.STRING, description: "Destination city or landmark (e.g., 'Johor Bahru', 'Toppen Shopping Centre', 'Tokyo', 'Terengganu')" },
+            nights: { type: Type.NUMBER, description: "Number of nights stay" },
+            guests: { type: Type.NUMBER, description: "Number of guests" }
+          },
+          required: ["destination"]
+        }
+      },
+      {
+        name: "canva_generate_design",
+        description: "PLUGIN (Canva): Generate promotional posters, social media banners (Instagram 1:1, Story 9:16, Banner 16:9), and marketing graphics via Canva.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "Headline or title of the marketing banner/poster" },
+            type: { type: Type.STRING, description: "Design type: 'poster' | 'instagram_post' | 'story' | 'banner'" },
+            theme: { type: Type.STRING, description: "Design visual theme or colors (e.g. 'red spicy', 'festival pop-up')" },
+            promoText: { type: Type.STRING, description: "Special offer or description copy" }
+          },
+          required: ["title"]
+        }
+      },
+      {
+        name: "adobe_process_asset",
+        description: "PLUGIN (Adobe Creative Cloud): Process high-resolution graphics, remove backgrounds, convert to print-ready CMYK, and upscale assets.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            asset_name: { type: Type.STRING, description: "Name of asset or image (e.g., 'botol_kuah_colek.png')" },
+            operation: { type: Type.STRING, description: "One of: 'remove_background', 'upscale_resolution', 'cmyk_color_profile'" }
+          },
+          required: ["asset_name", "operation"]
+        }
+      },
+      {
+        name: "github_manage_repo",
+        description: "PLUGIN (GitHub): Manage Pull Requests (PR), inspect code diffs, track issues, and list commits on repository 'thisisabangcolek-web/Abang-Colek'.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            action: { type: Type.STRING, description: "Action: 'list_prs' | 'list_issues' | 'create_issue' | 'list_commits'" },
+            title: { type: Type.STRING, description: "Title if creating an issue" },
+            body: { type: Type.STRING, description: "Details of issue or PR" }
+          },
+          required: ["action"]
+        }
+      },
+      {
+        name: "vercel_deploy_status",
+        description: "PLUGIN (Vercel): Check deployment health, production domain preview links, build logs, and edge runtime status.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {},
+          required: []
+        }
+      },
+      {
+        name: "supabase_query_db",
+        description: "PLUGIN (Supabase): Run safe SQL queries, check RLS security policies, and inspect forensic evidence and orders tables in PostgreSQL.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            table: { type: Type.STRING, description: "Table name (e.g. 'evidence_snapshots', 'orders', 'knowledge_graph')" },
+            query: { type: Type.STRING, description: "SQL query statement" }
+          },
+          required: []
+        }
+      },
+      {
+        name: "mixpanel_track_analytics",
+        description: "PLUGIN (Mixpanel): Analyze product conversion funnels (TikTok to WhatsApp to stalls), retention cohorts, and user event tracking.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            metric: { type: Type.STRING, description: "Metric type: 'funnel' | 'retention' | 'events'" }
+          },
+          required: []
+        }
+      },
+      {
+        name: "coros_health_metrics",
+        description: "PLUGIN (COROS): Track athlete and crew fitness stamina, training load, heart rate zones, and physical recovery hours.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {},
+          required: []
+        }
+      },
+      {
+        name: "apple_health_summary",
+        description: "PLUGIN (Apple Health): Track daily steps, active calories burned, sleep quality hours, and resting heart rate.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {},
+          required: []
+        }
+      },
+      {
+        name: "google_drive_search_files",
+        description: "PLUGIN (Google Drive): Search documents, PDFs, pricing catalogs, and spreadsheets stored in Google Drive.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            query: { type: Type.STRING, description: "Keyword or file name to search" }
+          },
+          required: []
+        }
       }
     ],
   },
@@ -577,6 +742,19 @@ Core Business Knowledge:
 - 8 Foundational Business Questions: Use 'update_business_workflow' to manage owner sign-off and risk status for ORDER_FLOW, STOCK_OWNERSHIP, AGENT_RESTOCK, COMPLAINT_TRACE, PRODUCTION_TRACE, TRANSPORT_TRACE, EVENT_CREW, PAYMENT_CLOSE.
 - Live Orders: Use 'create_order' to record new sales or 'issue_refund' to approve refunds with persistent tracking.
 - Google Workspace: Fully utilize 'send_gmail_email', 'create_google_task', 'create_google_doc', 'schedule_calendar_event', 'create_google_sheet', 'create_google_form', 'create_meet_space', and 'send_chat_message'.
+- 3P Plugins Ecosystem: You are empowered with active 3P Plugins to execute real actions and retrieve live external account data:
+  * Skyscanner ('skyscanner_search_flights'): Search flight tickets, airlines, airfares (MYR), and direct booking links.
+  * Booking.com ('booking_search_hotels'): Search hotels, homestays for stall crews, room rates (MYR), and amenities.
+  * Canva ('canva_generate_design'): Generate marketing graphic designs, promotional posters (1:1, 9:16, 16:9), and direct Canva editing links.
+  * Adobe ('adobe_process_asset'): Process high-res images, remove backgrounds, and export print-ready CMYK assets.
+  * GitHub ('github_manage_repo'): Inspect PRs, issues, commits, and create bug issues on 'thisisabangcolek-web/Abang-Colek'.
+  * Vercel ('vercel_deploy_status'): Check production deployment status, preview URLs, build times, and Edge regions.
+  * Supabase ('supabase_query_db'): Query PostgreSQL tables (evidence_snapshots, orders, entities) with RLS security.
+  * Mixpanel ('mixpanel_track_analytics'): Analyze conversion funnels (TikTok -> WhatsApp -> pop-up stalls) and retention.
+  * COROS ('coros_health_metrics'): Monitor athlete/crew fitness stamina, daily steps, heart rate zones, and recovery hours.
+  * Apple Health ('apple_health_summary'): Check daily steps, calories burned, sleep metrics, and resting heart rate.
+  * Google Drive ('google_drive_search_files'): Search PDF pricing catalogs, SOP documents, and spreadsheets in Drive.
+When a user asks to search flights, find hotels, design posters, check GitHub, query database, or check health data, immediately call the corresponding plugin tool.
 
 Behavior:
 - Be proactive, efficient, and direct in Malay or English as requested by the user.
@@ -683,6 +861,7 @@ Behavior:
               toolArgs: call.args,
               status: 'streaming'
             });
+            notifyToolExecution(true, call.name);
             notify(false, finalFullText);
 
             const toolStartTime = performance.now();
@@ -1176,6 +1355,28 @@ Behavior:
               } catch (err: any) {
                 output = { success: false, error: err.message };
               }
+            } else if (call.name === "skyscanner_search_flights") {
+              output = await executeSkyscannerSearch(call.args as any);
+            } else if (call.name === "booking_search_hotels") {
+              output = await executeBookingSearch(call.args as any);
+            } else if (call.name === "canva_generate_design") {
+              output = await executeCanvaDesign(call.args as any);
+            } else if (call.name === "adobe_process_asset") {
+              output = await executeAdobeProcess(call.args as any);
+            } else if (call.name === "github_manage_repo") {
+              output = await executeGitHubManage(call.args as any);
+            } else if (call.name === "vercel_deploy_status") {
+              output = await executeVercelStatus();
+            } else if (call.name === "supabase_query_db") {
+              output = await executeSupabaseQuery(call.args as any);
+            } else if (call.name === "mixpanel_track_analytics") {
+              output = await executeMixpanelAnalytics();
+            } else if (call.name === "coros_health_metrics") {
+              output = await executeCorosMetrics();
+            } else if (call.name === "apple_health_summary") {
+              output = await executeAppleHealthSummary();
+            } else if (call.name === "google_drive_search_files") {
+              output = await executeGoogleDriveSearch(call.args as any);
             }
 
             const toolEndTime = performance.now();
@@ -1186,6 +1387,7 @@ Behavior:
               steps[stepIndex].result = output;
               steps[stepIndex].latencyMs = toolEndTime - toolStartTime;
             }
+            notifyToolExecution(false);
             notify(false, finalFullText);
 
             toolResults.push({
@@ -1225,6 +1427,19 @@ Behavior:
     const generatedMeetStep = steps.find(s => s.type === 'tool' && s.toolName === "create_meet_space");
     const generatedChatStep = steps.find(s => s.type === 'tool' && s.toolName === "send_chat_message");
     const generatedJevStep = steps.find(s => s.type === 'tool' && s.toolName === "jev_classify_issue");
+    const generatedPluginStep = steps.find(s => s.type === 'tool' && (
+      s.toolName === "skyscanner_search_flights" ||
+      s.toolName === "booking_search_hotels" ||
+      s.toolName === "canva_generate_design" ||
+      s.toolName === "adobe_process_asset" ||
+      s.toolName === "github_manage_repo" ||
+      s.toolName === "vercel_deploy_status" ||
+      s.toolName === "supabase_query_db" ||
+      s.toolName === "mixpanel_track_analytics" ||
+      s.toolName === "coros_health_metrics" ||
+      s.toolName === "apple_health_summary" ||
+      s.toolName === "google_drive_search_files"
+    ));
 
     const modelMsg: ChatMessage = {
       role: "model",
@@ -1251,12 +1466,17 @@ Behavior:
       chatData: generatedChatStep?.result?.data,
       hasJev: Boolean(generatedJevStep),
       jevData: generatedJevStep?.result?.data,
+      hasPlugin: Boolean(generatedPluginStep),
+      pluginType: generatedPluginStep?.toolName,
+      pluginData: generatedPluginStep?.result?.data,
     };
     currentHistory.push(modelMsg);
     
     notify(true, "");
+    notifyToolExecution(false);
 
   } catch (error: any) {
+    notifyToolExecution(false);
     console.error("Agent Error:", error);
     const errorMsg: ChatMessage = {
       role: "model",
@@ -1310,6 +1530,19 @@ Core Business Knowledge:
 - 8 Foundational Business Questions: Use 'update_business_workflow' to manage owner sign-off and risk status for ORDER_FLOW, STOCK_OWNERSHIP, AGENT_RESTOCK, COMPLAINT_TRACE, PRODUCTION_TRACE, TRANSPORT_TRACE, EVENT_CREW, PAYMENT_CLOSE.
 - Live Orders: Use 'create_order' to record new sales or 'issue_refund' to approve refunds with persistent tracking.
 - Google Workspace: Fully utilize 'send_gmail_email', 'create_google_task', 'create_google_doc', 'schedule_calendar_event', 'create_google_sheet', 'create_google_form', 'create_meet_space', and 'send_chat_message'.
+- 3P Plugins Ecosystem: You are empowered with active 3P Plugins to execute real actions and retrieve live external account data:
+  * Skyscanner ('skyscanner_search_flights'): Search flight tickets, airlines, airfares (MYR), and direct booking links.
+  * Booking.com ('booking_search_hotels'): Search hotels, homestays for stall crews, room rates (MYR), and amenities.
+  * Canva ('canva_generate_design'): Generate marketing graphic designs, promotional posters (1:1, 9:16, 16:9), and direct Canva editing links.
+  * Adobe ('adobe_process_asset'): Process high-res images, remove backgrounds, and export print-ready CMYK assets.
+  * GitHub ('github_manage_repo'): Inspect PRs, issues, commits, and create bug issues on 'thisisabangcolek-web/Abang-Colek'.
+  * Vercel ('vercel_deploy_status'): Check production deployment status, preview URLs, build times, and Edge regions.
+  * Supabase ('supabase_query_db'): Query PostgreSQL tables (evidence_snapshots, orders, entities) with RLS security.
+  * Mixpanel ('mixpanel_track_analytics'): Analyze conversion funnels (TikTok -> WhatsApp -> pop-up stalls) and retention.
+  * COROS ('coros_health_metrics'): Monitor athlete/crew fitness stamina, daily steps, heart rate zones, and recovery hours.
+  * Apple Health ('apple_health_summary'): Check daily steps, calories burned, sleep metrics, and resting heart rate.
+  * Google Drive ('google_drive_search_files'): Search PDF pricing catalogs, SOP documents, and spreadsheets in Drive.
+When a user asks to search flights, find hotels, design posters, check GitHub, query database, or check health data, immediately call the corresponding plugin tool.
 
 Behavior:
 - Be proactive, efficient, and direct in Malay or English as requested by the user.
@@ -1722,6 +1955,28 @@ Behavior:
             } catch (err: any) {
               output = { success: false, error: err.message };
             }
+          } else if (call.name === "skyscanner_search_flights") {
+            output = await executeSkyscannerSearch(call.args as any);
+          } else if (call.name === "booking_search_hotels") {
+            output = await executeBookingSearch(call.args as any);
+          } else if (call.name === "canva_generate_design") {
+            output = await executeCanvaDesign(call.args as any);
+          } else if (call.name === "adobe_process_asset") {
+            output = await executeAdobeProcess(call.args as any);
+          } else if (call.name === "github_manage_repo") {
+            output = await executeGitHubManage(call.args as any);
+          } else if (call.name === "vercel_deploy_status") {
+            output = await executeVercelStatus();
+          } else if (call.name === "supabase_query_db") {
+            output = await executeSupabaseQuery(call.args as any);
+          } else if (call.name === "mixpanel_track_analytics") {
+            output = await executeMixpanelAnalytics();
+          } else if (call.name === "coros_health_metrics") {
+            output = await executeCorosMetrics();
+          } else if (call.name === "apple_health_summary") {
+            output = await executeAppleHealthSummary();
+          } else if (call.name === "google_drive_search_files") {
+            output = await executeGoogleDriveSearch(call.args as any);
           }
 
           
@@ -1778,6 +2033,20 @@ Behavior:
     const generatedChat = allToolCallRecords.find(t => t.name === "send_chat_message");
     const generatedJev = allToolCallRecords.find(t => t.name === "jev_classify_issue");
     const jevResultRecord = allToolOutputs.find(t => t.name === "jev_classify_issue");
+    const generatedPlugin = allToolCallRecords.find(t => (
+      t.name === "skyscanner_search_flights" ||
+      t.name === "booking_search_hotels" ||
+      t.name === "canva_generate_design" ||
+      t.name === "adobe_process_asset" ||
+      t.name === "github_manage_repo" ||
+      t.name === "vercel_deploy_status" ||
+      t.name === "supabase_query_db" ||
+      t.name === "mixpanel_track_analytics" ||
+      t.name === "coros_health_metrics" ||
+      t.name === "apple_health_summary" ||
+      t.name === "google_drive_search_files"
+    ));
+    const pluginResultRecord = allToolOutputs.find(t => t.name === generatedPlugin?.name);
 
     // Final response from model
     const modelMsg: ChatMessage = {
@@ -1798,6 +2067,9 @@ Behavior:
       hasChat: Boolean(generatedChat),
       hasJev: Boolean(generatedJev),
       jevData: jevResultRecord?.result?.data,
+      hasPlugin: Boolean(generatedPlugin),
+      pluginType: generatedPlugin?.name,
+      pluginData: pluginResultRecord?.result?.data,
     };
     currentHistory.push(modelMsg);
     

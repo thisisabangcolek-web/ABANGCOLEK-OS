@@ -28,13 +28,16 @@ import {
   MessageSquare,
   Flame,
   Plus,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
-import { sendMessageToAgentStream, ChatMessage, ToolCall, MOCK_DB, AgentStep } from '@/services/gemini';
+import { sendMessageToAgentStream, ChatMessage, ToolCall, MOCK_DB, AgentStep, subscribeToolExecution } from '@/services/gemini';
 import { appStore, OrderItem } from '@/services/store';
 import { AbangColekDiscoveryView } from '@/components/AbangColekDiscoveryView';
+import { PluginsView } from '@/components/PluginsView';
+import { PluginArtifactCard } from '@/components/PluginArtifactCard';
 import { FormsView } from '@/components/FormsView';
 import { GmailView } from '@/components/GmailView';
 import { TasksView } from '@/components/TasksView';
@@ -49,7 +52,15 @@ import { User as FbUser } from 'firebase/auth';
 
 // --- Components ---
 
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
+const Sidebar = ({ 
+  activeTab, 
+  setActiveTab, 
+  isToolOrPluginInProgress 
+}: { 
+  activeTab: string; 
+  setActiveTab: (t: string) => void;
+  isToolOrPluginInProgress?: boolean;
+}) => {
   const [googleUser, setGoogleUser] = useState<FbUser | null>(null);
 
   useEffect(() => {
@@ -61,6 +72,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
   const workspaceItems = [
     { id: 'discovery', label: 'Abang Colek Hub', icon: Flame, badge: 'v4.2' },
     { id: 'chat', label: 'Agent Chat', icon: Bot },
+    { id: 'plugins', label: 'Gedung Plugins', icon: Zap, badge: '11 Aktif' },
     { id: 'gmail', label: 'Gmail', icon: Mail },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
@@ -92,33 +104,79 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
         <div>
           <p className="px-4 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Workspace & AI</p>
           <div className="space-y-1">
-            {workspaceItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "w-full flex items-center justify-between px-3.5 py-2.5 rounded-full font-medium transition-all text-left",
-                  activeTab === item.id 
-                    ? "bg-black text-white shadow-sm" 
-                    : "text-zinc-600 hover:bg-black/[0.04] hover:text-black"
-                )}
-              >
-                <div className="flex items-center gap-2.5 truncate">
-                  <item.icon size={15} strokeWidth={activeTab === item.id ? 2.5 : 2} className="shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </div>
-                {item.badge && (
-                  <span className={cn(
-                    "text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0",
+            {workspaceItems.map((item) => {
+              const isChat = item.id === 'chat';
+              const isExecuting = isChat && isToolOrPluginInProgress;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3.5 py-2.5 rounded-full font-medium transition-all text-left group",
                     activeTab === item.id 
-                      ? "bg-white/20 text-white" 
-                      : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                  )}>
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            ))}
+                      ? "bg-black text-white shadow-sm" 
+                      : "text-zinc-600 hover:bg-black/[0.04] hover:text-black",
+                    isExecuting && activeTab !== item.id && "bg-amber-50/80 border border-amber-200/60 text-amber-950"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    {isExecuting ? (
+                      <span className="relative flex items-center justify-center shrink-0 w-4 h-4">
+                        <motion.span
+                          animate={{
+                            scale: [1, 1.25, 1],
+                            opacity: [0.8, 1, 0.8],
+                          }}
+                          transition={{
+                            repeat: Infinity,
+                            duration: 1.5,
+                            ease: "easeInOut",
+                          }}
+                          className="flex items-center justify-center"
+                        >
+                          <item.icon 
+                            size={15} 
+                            strokeWidth={activeTab === item.id ? 2.5 : 2} 
+                            className={cn(
+                              "shrink-0 transition-colors",
+                              activeTab === item.id ? "text-amber-300" : "text-amber-600"
+                            )} 
+                          />
+                        </motion.span>
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2 pointer-events-none">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                        </span>
+                      </span>
+                    ) : (
+                      <item.icon size={15} strokeWidth={activeTab === item.id ? 2.5 : 2} className="shrink-0" />
+                    )}
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {isExecuting ? (
+                    <span className={cn(
+                      "text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-1",
+                      activeTab === item.id 
+                        ? "bg-amber-400/20 text-amber-200 border border-amber-300/30" 
+                        : "bg-amber-100 text-amber-800 border border-amber-300/60 shadow-xs"
+                    )}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                      <span>Running</span>
+                    </span>
+                  ) : item.badge && (
+                    <span className={cn(
+                      "text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0",
+                      activeTab === item.id 
+                        ? "bg-white/20 text-white" 
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                    )}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -346,6 +404,26 @@ const ChatInterface = ({
                   <Video size={13} className="text-teal-600" />
                   Bilik Krew Pop-Up (Meet)
                 </button>
+                <button onClick={() => onSendMessage("Cari tiket penerbangan murah ke Tokyo Jepun minggu depan di Skyscanner")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-teal-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Zap size={13} className="text-teal-600" />
+                  Tiket Jepun (Skyscanner)
+                </button>
+                <button onClick={() => onSendMessage("Reka poster promosi gerai pop-up Abang Colek di Canva saiz Instagram 1:1")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-cyan-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Zap size={13} className="text-cyan-600" />
+                  Reka Poster (Canva)
+                </button>
+                <button onClick={() => onSendMessage("Semak Pull Request terbaru di repositori GitHub Abang Colek")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-900 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Zap size={13} className="text-zinc-900" />
+                  Semak Kod PR (GitHub)
+                </button>
+                <button onClick={() => onSendMessage("Cari hotel berhampiran Toppen Shopping Centre Johor Bahru untuk krew di Booking.com")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-blue-800 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Zap size={13} className="text-blue-800" />
+                  Hotel Krew JB (Booking)
+                </button>
+                <button onClick={() => onSendMessage("Semak data latihan COROS dan stamina kecergasan krew hari ini")} className="px-3.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-orange-700 font-medium text-[12px] flex items-center gap-1.5 shadow-xs">
+                  <Zap size={13} className="text-orange-600" />
+                  Data Latihan (COROS)
+                </button>
               </div>
             </div>
           )}
@@ -371,15 +449,20 @@ const ChatInterface = ({
                 "rounded-3xl text-[14px] leading-relaxed max-w-[85%] font-medium",
                 msg.role === 'user' 
                   ? "p-5 bg-black text-white rounded-br-[8px]" 
-                  : (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat)
+                  : (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat || msg.hasPlugin)
                     ? "p-0" 
                     : "p-5 bg-white rounded-bl-[8px] text-zinc-800 border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
               )}>
-                {msg.role === 'model' && (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat) ? (
+                {msg.role === 'model' && (msg.hasReport || msg.hasDashboard || msg.hasForm || msg.hasEmail || msg.hasTask || msg.hasDoc || msg.hasCalendar || msg.hasSheet || msg.hasMeet || msg.hasChat || msg.hasPlugin) ? (
                   <div className="flex flex-col gap-3 min-w-[220px]">
                     <div className="p-4 bg-white border border-black/5 rounded-3xl rounded-bl-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex flex-col gap-2.5">
                       <span className="font-semibold text-[14px] text-zinc-900 flex items-center gap-2">
-                        {msg.hasEmail ? (
+                        {msg.hasPlugin ? (
+                          <>
+                            <Zap size={16} className="text-amber-500 fill-amber-500" />
+                            Tindakan Plugin 3P Selesai
+                          </>
+                        ) : msg.hasEmail ? (
                           <>
                             <Mail size={16} className="text-red-600" />
                             Email Delivered via Gmail
@@ -441,6 +524,9 @@ const ChatInterface = ({
                         <p className="text-xs text-zinc-600 font-medium">
                           "{msg.taskData.title}"
                         </p>
+                      )}
+                      {msg.hasPlugin && msg.pluginData && (
+                        <PluginArtifactCard pluginType={msg.pluginType || ''} data={msg.pluginData} onOpenStore={() => setActiveTab('plugins')} />
                       )}
                       {msg.latencyMs && (
                         <div className="text-emerald-600 flex items-center gap-1.5 text-[11px] font-medium">
@@ -547,6 +633,15 @@ const ChatInterface = ({
                           Buka Hab JEV Abang Colek &rarr;
                         </button>
                       )}
+                      {msg.hasPlugin && (
+                        <button 
+                          onClick={() => setActiveTab('plugins')}
+                          className="bg-black text-white px-5 py-2.5 rounded-full font-semibold w-max hover:bg-zinc-800 transition-colors text-[13px] shadow-sm flex items-center gap-2"
+                        >
+                          <Zap size={14} className="text-amber-400" />
+                          Buka Gedung Plugins &rarr;
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -554,6 +649,10 @@ const ChatInterface = ({
                     <div className={cn("markdown-body", msg.role === 'user' ? "text-white" : "text-zinc-800")}>
                       <ReactMarkdown>{msg.parts?.map((p: any) => p.text || "").join("") || ""}</ReactMarkdown>
                     </div>
+
+                    {msg.hasPlugin && msg.pluginData && (
+                      <PluginArtifactCard pluginType={msg.pluginType || ''} data={msg.pluginData} onOpenStore={() => setActiveTab('plugins')} />
+                    )}
 
                     {msg.role === 'model' && msg.latencyMs !== undefined && (
                       <div className="mt-4 pt-4 border-t border-black/[0.04] flex items-center justify-end text-emerald-600 text-[11px]">
@@ -665,18 +764,39 @@ const ChatInterface = ({
 
         {/* Input Area */}
         <div className="p-4 md:p-6 shrink-0 bg-white">
+          {/* Active Plugins Bar */}
+          <div className="mb-2.5 px-2 flex items-center justify-between text-[11px] text-zinc-500">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                <Zap size={11} className="text-amber-500 fill-amber-500" />
+                Plugins Aktif:
+              </span>
+              {['Skyscanner', 'Booking.com', 'Canva', 'GitHub', 'Vercel', 'Supabase', 'COROS'].map((name, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-medium shrink-0 text-[10px]">
+                  {name}
+                </span>
+              ))}
+            </div>
+            <button 
+              onClick={() => setActiveTab('plugins')}
+              className="text-[11px] font-bold text-black hover:underline shrink-0 ml-2 cursor-pointer flex items-center gap-1"
+            >
+              <span>+ Gedung Plugin</span>
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="relative flex items-center bg-zinc-50 rounded-full border border-black/5 p-2 focus-within:ring-2 focus-within:ring-black/5 focus-within:border-black/10 transition-all">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Write a message..."
+              placeholder="Tanya apa sahaja atau aktifkan plugin (cth: cari tiket ke Tokyo, reka poster di Canva, semak PR di GitHub)..."
               disabled={isProcessing}
               className="flex-1 bg-transparent px-5 py-2 outline-none placeholder:text-zinc-400 text-zinc-900 text-[14px] font-medium"
             />
             <button 
               type="submit"
               disabled={!input.trim() || isProcessing}
-              className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-50 transition-colors ml-2 hover:bg-zinc-800"
+              className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-50 transition-colors ml-2 hover:bg-zinc-800 cursor-pointer"
             >
               {isProcessing ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} className="text-white relative right-0.5 top-0.5" strokeWidth={2} />}
             </button>
@@ -684,14 +804,20 @@ const ChatInterface = ({
 
           {history.length > 0 && (
             <div className="flex flex-wrap justify-center gap-2 mt-4 w-full">
-              <button onClick={() => onSendMessage("Siasat aduan penutup botol kuah colek bocor (LEAKAGE) di Terengganu menggunakan JEV System-1.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-red-600 font-medium text-[12px]">
+              <button onClick={() => onSendMessage("Siasat aduan penutup botol kuah colek bocor (LEAKAGE) di Terengganu menggunakan JEV System-1.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-red-600 font-medium text-[12px] cursor-pointer">
                 Siasat Aduan Botol Bocor (JEV)
               </button>
-              <button onClick={() => onSendMessage("Cipta dashboard operasi jualan mengikut bandar (Johor Bahru, Shah Alam, Terengganu, Bangi).")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-700 font-medium text-[12px]">
-                Dashboard Jualan Hab Malaysia
+              <button onClick={() => onSendMessage("Cari tiket penerbangan murah ke Tokyo Jepun minggu depan di Skyscanner.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-teal-700 font-medium text-[12px] cursor-pointer">
+                Tiket Tokyo (Skyscanner)
               </button>
-              <button onClick={() => onSendMessage("Cari pesanan bermasalah di Terengganu dan luluskan bayaran balik RM35 segera.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-emerald-700 font-medium text-[12px]">
-                Luluskan Bayaran Balik RM (Live)
+              <button onClick={() => onSendMessage("Reka poster promosi kombo kuah colek di Canva saiz Instagram 1:1.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-cyan-700 font-medium text-[12px] cursor-pointer">
+                Reka Poster (Canva)
+              </button>
+              <button onClick={() => onSendMessage("Semak Pull Request dan Issues terkini di GitHub.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-zinc-800 font-medium text-[12px] cursor-pointer">
+                Semak PR (GitHub)
+              </button>
+              <button onClick={() => onSendMessage("Semak data latihan COROS dan stamina kecergasan krew gerai hari ini.")} className="px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-all border border-black/5 text-orange-700 font-medium text-[12px] cursor-pointer">
+                Stamina Krew (COROS)
               </button>
             </div>
           )}
@@ -1220,10 +1346,19 @@ const DashboardsView = ({ onAction }: { onAction: (msg?: string) => void }) => {
   );
 };
 
-const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
+const BottomNav = ({ 
+  activeTab, 
+  setActiveTab, 
+  isToolOrPluginInProgress 
+}: { 
+  activeTab: string; 
+  setActiveTab: (t: string) => void;
+  isToolOrPluginInProgress?: boolean;
+}) => {
   const menuItems = [
     { id: 'discovery', label: 'Discovery', icon: Flame },
     { id: 'chat', label: 'Chat', icon: Bot },
+    { id: 'plugins', label: 'Plugins', icon: Zap },
     { id: 'gmail', label: 'Gmail', icon: Mail },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
@@ -1235,21 +1370,47 @@ const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTa
 
   return (
     <div className="md:hidden flex items-center justify-around bg-white border-t border-black/5 px-2 py-2.5 shrink-0 pb-safe overflow-x-auto">
-      {menuItems.map((item) => (
-        <button
-          key={item.id}
-          onClick={() => setActiveTab(item.id)}
-          className={cn(
-            "flex flex-col items-center gap-1 px-2.5 py-1 rounded-xl transition-all shrink-0",
-            activeTab === item.id 
-              ? "text-black font-semibold" 
-              : "text-zinc-400 hover:text-zinc-600"
-          )}
-        >
-          <item.icon size={18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-          <span className="text-[10px] font-medium">{item.label}</span>
-        </button>
-      ))}
+      {menuItems.map((item) => {
+        const isChat = item.id === 'chat';
+        const isExecuting = isChat && isToolOrPluginInProgress;
+
+        return (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={cn(
+              "flex flex-col items-center gap-1 px-2.5 py-1 rounded-xl transition-all shrink-0",
+              activeTab === item.id 
+                ? "text-black font-semibold" 
+                : "text-zinc-400 hover:text-zinc-600",
+              isExecuting && activeTab !== item.id && "text-amber-600 font-medium"
+            )}
+          >
+            {isExecuting ? (
+              <div className="relative flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.25, 1], opacity: [0.8, 1, 0.8] }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                  className="flex items-center justify-center"
+                >
+                  <item.icon 
+                    size={18} 
+                    strokeWidth={activeTab === item.id ? 2.5 : 2} 
+                    className="text-amber-500" 
+                  />
+                </motion.div>
+                <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 pointer-events-none">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                </span>
+              </div>
+            ) : (
+              <item.icon size={18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+            )}
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };
@@ -1261,26 +1422,55 @@ export default function App() {
   const [currentTool, setCurrentTool] = useState<ToolCall | null>(null);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [streamingText, setStreamingText] = useState("");
+  const [isToolExecuting, setIsToolExecuting] = useState(false);
+
+  useEffect(() => {
+    return subscribeToolExecution((executing) => {
+      setIsToolExecuting(executing);
+    });
+  }, []);
+
+  const isToolOrPluginInProgress = Boolean(
+    isToolExecuting ||
+    (isProcessing && (
+      Boolean(currentTool) ||
+      agentSteps.some(s => s.type === 'tool' && s.status === 'streaming')
+    ))
+  );
 
   const handleSendMessage = async (msg: string) => {
     setIsProcessing(true);
     setStreamingText("");
     setAgentSteps([]);
+    setCurrentTool(null);
     try {
       await sendMessageToAgentStream(history, msg, (data) => {
         if (data.isDone) {
           setHistory(data.history);
           setIsProcessing(false);
           setStreamingText("");
+          setCurrentTool(null);
+          setAgentSteps(data.steps);
         } else {
           setHistory(data.history);
           setAgentSteps(data.steps);
           setStreamingText(data.currentText);
+          const activeToolStep = data.steps.find(s => s.type === 'tool' && s.status === 'streaming');
+          if (activeToolStep) {
+            setCurrentTool({
+              id: activeToolStep.id,
+              name: activeToolStep.toolName || '',
+              args: activeToolStep.toolArgs || {}
+            });
+          } else {
+            setCurrentTool(null);
+          }
         }
       });
     } catch (e) {
       console.error(e);
       setIsProcessing(false);
+      setCurrentTool(null);
     }
   };
 
@@ -1293,7 +1483,11 @@ export default function App() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen font-sans text-zinc-900 bg-[#F3F3F3] overflow-hidden selection:bg-black selection:text-white">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isToolOrPluginInProgress={isToolOrPluginInProgress} 
+      />
       
       {/* Mobile Header */}
       <div className="md:hidden flex items-center px-6 pt-6 pb-2 shrink-0">
@@ -1317,6 +1511,7 @@ export default function App() {
               setActiveTab={setActiveTab}
             />
           )}
+          {activeTab === 'plugins' && <PluginsView onAction={handleAction} />}
           {activeTab === 'gmail' && <GmailView onAction={handleAction} />}
           {activeTab === 'calendar' && <CalendarView onAction={handleAction} />}
           {activeTab === 'tasks' && <TasksView onAction={handleAction} />}
@@ -1337,7 +1532,11 @@ export default function App() {
         </div>
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isToolOrPluginInProgress={isToolOrPluginInProgress} 
+      />
     </div>
   );
 }
