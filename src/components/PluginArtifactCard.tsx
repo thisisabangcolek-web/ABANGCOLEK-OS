@@ -363,15 +363,27 @@ export const PluginArtifactCard: React.FC<PluginArtifactCardProps> = ({ pluginTy
             RLS Active · {sb.executionTimeMs}ms
           </span>
         </div>
+        <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+          <span className="truncate">Projek: bktksvhcgszaoqkdyhil.supabase.co</span>
+          <span className="text-emerald-600 font-bold shrink-0 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE CLOUD
+          </span>
+        </div>
         <p className="font-mono text-[10px] bg-zinc-900 text-zinc-200 p-2 rounded-lg truncate">
           {sb.query}
         </p>
         <div className="space-y-1.5 pt-1">
-          {sb.rows.slice(0, 3).map((r, i) => (
-            <div key={i} className="p-2 rounded-lg bg-zinc-50 border border-black/5 text-[11px] font-mono flex justify-between text-zinc-700">
-              <span>ID: {r.id}</span>
-              <span>Platform: {r.platform}</span>
-              <span className="text-emerald-600 font-bold">{r.status}</span>
+          {sb.rows.slice(0, 4).map((r, i) => (
+            <div key={i} className="p-2 rounded-lg bg-zinc-50 border border-black/5 text-[11px] font-mono flex flex-wrap justify-between gap-1 text-zinc-700">
+              {r.id ? <span>ID: <strong className="text-zinc-900">{r.id}</strong></span> : null}
+              {r.customer_name ? <span>Pelanggan: {r.customer_name}</span> : null}
+              {r.total_amount ? <span className="text-emerald-700 font-bold">RM {r.total_amount}</span> : null}
+              {r.project ? <span>Ref: <strong>{r.project}</strong></span> : null}
+              {r.table ? <span>Jadual: <strong>{r.table}</strong></span> : null}
+              {r.status ? <span className="text-emerald-600 font-bold">{r.status}</span> : null}
+              {r.note ? <span className="text-zinc-500 italic">{r.note}</span> : null}
+              {r.response ? <span className="text-zinc-600">{r.response}</span> : null}
             </div>
           ))}
         </div>

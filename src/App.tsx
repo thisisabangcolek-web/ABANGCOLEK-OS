@@ -49,6 +49,8 @@ import { MeetView } from '@/components/MeetView';
 import { ChatWorkspaceView } from '@/components/ChatWorkspaceView';
 import { subscribeAuth } from '@/services/googleAuth';
 import { User as FbUser } from 'firebase/auth';
+import { OrdersView } from '@/components/OrdersView';
+import { useSupabaseAuth } from '@/services/supabaseAuth';
 
 // --- Components ---
 
@@ -62,6 +64,7 @@ const Sidebar = ({
   isToolOrPluginInProgress?: boolean;
 }) => {
   const [googleUser, setGoogleUser] = useState<FbUser | null>(null);
+  const { user: supabaseUser, quickStaffSignIn, signOut: supabaseSignOut } = useSupabaseAuth();
 
   useEffect(() => {
     return subscribeAuth((u) => {
@@ -204,15 +207,55 @@ const Sidebar = ({
         </div>
       </nav>
 
-      {/* Google Workspace Connection Pill in Sidebar Footer */}
-      <div className="pr-1 pt-3 border-t border-black/[0.04] shrink-0">
+      {/* Supabase Database & Auth Pill in Sidebar Footer */}
+      <div className="pr-1 pt-3 border-t border-black/[0.04] shrink-0 space-y-2">
+        <div className="p-3 rounded-2xl bg-white border border-black/[0.04] shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Supabase Auth
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+              Live DB
+            </span>
+          </div>
+          <p className="text-[10px] text-zinc-500 mt-1 truncate font-mono">
+            {supabaseUser?.email || 'thisisabangcolek@gmail.com'}
+          </p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <button
+              onClick={() => quickStaffSignIn('hq_admin')}
+              className="text-[10px] px-2 py-0.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold transition-colors cursor-pointer"
+              title="Tukar sesi ke HQ Admin"
+            >
+              HQ Admin
+            </button>
+            <button
+              onClick={() => quickStaffSignIn('stockist_kt')}
+              className="text-[10px] px-2 py-0.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold transition-colors cursor-pointer"
+              title="Tukar sesi ke Stokis Terengganu"
+            >
+              Stokis KT
+            </button>
+            {supabaseUser && (
+              <button
+                onClick={() => supabaseSignOut()}
+                className="text-[10px] px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-600 font-semibold ml-auto transition-colors cursor-pointer"
+              >
+                Log Keluar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Google Workspace Connection Pill */}
         <button
           onClick={() => setActiveTab('gmail')}
-          className="w-full text-left p-3 rounded-2xl bg-white border border-black/[0.04] hover:border-black/20 transition-all shadow-xs group"
+          className="w-full text-left p-2.5 rounded-2xl bg-white border border-black/[0.04] hover:border-black/20 transition-all shadow-xs group"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
               Google Workspace
             </span>
             <span className={cn(
@@ -222,7 +265,7 @@ const Sidebar = ({
               {googleUser ? 'Connected' : 'Offline Mode'}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-400 mt-1 line-clamp-1">
+          <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">
             {googleUser ? (googleUser.displayName || googleUser.email) : 'Sign in on any tab'}
           </p>
         </button>
@@ -820,200 +863,6 @@ const ChatInterface = ({
                 Stamina Krew (COROS)
               </button>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const OrdersView = ({ onAction }: { onAction: (msg?: string) => void }) => {
-  const [orders, setOrders] = useState<OrderItem[]>(appStore.getOrders());
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newCust, setNewCust] = useState("");
-  const [newCity, setNewCity] = useState("johor bahru");
-  const [newItems, setNewItems] = useState("3x Kuah Colek Buah Original (500g)");
-  const [newAmount, setNewAmount] = useState("45");
-
-  useEffect(() => {
-    return appStore.subscribe(() => {
-      setOrders(appStore.getOrders());
-    });
-  }, []);
-
-  const handleAddOrder = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCust.trim()) return;
-    appStore.addOrder({
-      customer_id: newCust.trim(),
-      city: newCity,
-      items: newItems,
-      amount: parseFloat(newAmount) || 0,
-      status: 'Processing'
-    });
-    setNewCust("");
-    setShowAddModal(false);
-  };
-
-  const handleRefund = (orderId: string, amount: number) => {
-    appStore.issueRefund(orderId, amount, 'LEAKAGE / Kerosakan Botol');
-  };
-
-  return (
-    <div className="p-4 md:p-8 h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-4 pl-2">
-          <div>
-            <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Pangkalan Data Pesanan Sebenar</h2>
-            <p className="text-zinc-500 mt-1 text-[15px] font-medium">Urus dan pantau pesanan pelanggan serta stokis Abang Colek.</p>
-          </div>
-          <button 
-            onClick={() => setShowAddModal(true)} 
-            className="px-5 py-2.5 bg-black hover:bg-zinc-800 text-white rounded-full text-[13px] font-medium transition-all shadow-sm flex items-center gap-2 cursor-pointer w-max"
-          >
-            <Plus size={15} />
-            <span>+ Tambah Pesanan Baharu</span>
-          </button>
-        </div>
-
-        {/* Add Order Modal */}
-        {showAddModal && (
-          <div className="p-6 bg-white rounded-3xl border border-black/10 shadow-md space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-base text-zinc-900">Daftar Pesanan Baharu (Storan Sebenar)</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-xs font-semibold text-zinc-400 hover:text-zinc-700">Tutup</button>
-            </div>
-            <form onSubmit={handleAddOrder} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Nama / ID Pelanggan</label>
-                <input 
-                  type="text" 
-                  value={newCust} 
-                  onChange={(e) => setNewCust(e.target.value)} 
-                  placeholder="cth: Pn. Siti (Shah Alam)"
-                  required
-                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Bandar / Hab</label>
-                <select 
-                  value={newCity} 
-                  onChange={(e) => setNewCity(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium capitalize"
-                >
-                  <option value="johor bahru">Johor Bahru (HQ/Toppen)</option>
-                  <option value="shah alam">Shah Alam (Central Hub)</option>
-                  <option value="kuala terengganu">Kuala Terengganu (Stokis)</option>
-                  <option value="bangi">Bangi</option>
-                  <option value="kota bharu">Kota Bharu</option>
-                  <option value="penang">Penang</option>
-                  <option value="melaka">Melaka</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Item Produk</label>
-                <input 
-                  type="text" 
-                  value={newItems} 
-                  onChange={(e) => setNewItems(e.target.value)} 
-                  placeholder="cth: 3x Kuah Colek Buah Original"
-                  required
-                  className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Jumlah (RM)</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    value={newAmount} 
-                    onChange={(e) => setNewAmount(e.target.value)} 
-                    required
-                    className="w-full px-3 py-2 bg-zinc-50 border border-black/10 rounded-xl text-xs font-medium"
-                  />
-                  <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shrink-0 cursor-pointer">
-                    Simpan
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-        
-        <div className="grid gap-4">
-          {orders.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.04]">
-              <p className="text-zinc-400 font-medium">Tiada pesanan direkodkan.</p>
-            </div>
-          ) : (
-            orders.map((order, i) => (
-              <div key={order.order_id || i} className="bg-white p-6 rounded-3xl border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-black/10">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg text-zinc-900">{order.order_id}</h3>
-                    <span className="px-3 py-1 bg-zinc-50 rounded-full text-xs font-semibold text-zinc-700 border border-black/5 capitalize">{order.city}</span>
-                    <span className={cn(
-                      "px-3 py-0.5 text-xs font-bold rounded-full border",
-                      order.status === 'Delivered' ? "bg-emerald-50 border-emerald-200 text-emerald-700" : 
-                      order.status === 'Delayed' ? "bg-red-50 border-red-200 text-red-700" :
-                      order.status === 'Refunded' ? "bg-zinc-100 border-black/10 text-zinc-600" :
-                      "bg-blue-50 border-blue-200 text-blue-700"
-                    )}>
-                      {order.status}
-                    </span>
-                  </div>
-
-                  <p className="text-xs font-medium text-zinc-600">
-                    <strong className="text-zinc-900">Produk:</strong> {order.items}
-                  </p>
-
-                  {order.refund_reason && (
-                    <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 p-2 rounded-xl border border-amber-100">
-                      {order.refund_reason}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap gap-6 text-sm text-zinc-600 pt-1">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Pelanggan</span>
-                      <strong className="text-zinc-900 text-sm font-semibold">{order.customer_id}</strong>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Jumlah</span>
-                      <strong className="text-emerald-700 text-sm font-bold">RM {order.amount.toLocaleString()}</strong>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Tarikh</span>
-                      <strong className="text-zinc-600 text-sm font-medium">{new Date(order.date).toLocaleDateString()}</strong>
-                    </div>
-                    {order.delivered_date && (
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Diterima Pada</span>
-                        <strong className="text-zinc-900 text-sm font-medium">{new Date(order.delivered_date).toLocaleDateString()}</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {order.status !== 'Refunded' && (
-                    <button 
-                      onClick={() => handleRefund(order.order_id, order.amount)}
-                      className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      Bayar Balik (RM {order.amount})
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => onAction && onAction(`Siasat status pesanan ${order.order_id} bagi pelanggan ${order.customer_id} di ${order.city} menggunakan JEV System-1.`)}
-                    className="px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-full text-xs font-semibold transition-all cursor-pointer"
-                  >
-                    Semak di Chat &rarr;
-                  </button>
-                </div>
-              </div>
-            ))
           )}
         </div>
       </div>

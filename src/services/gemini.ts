@@ -646,11 +646,11 @@ export const tools = [
       },
       {
         name: "supabase_query_db",
-        description: "PLUGIN (Supabase): Run safe SQL queries, check RLS security policies, and inspect forensic evidence and orders tables in PostgreSQL.",
+        description: "PLUGIN (Supabase): Run safe SQL queries, check RLS security policies, and inspect orders, inventory, and JEV audit logs in live PostgreSQL on project bktksvhcgszaoqkdyhil.supabase.co.",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            table: { type: Type.STRING, description: "Table name (e.g. 'evidence_snapshots', 'orders', 'knowledge_graph')" },
+            table: { type: Type.STRING, description: "Table name (e.g. 'orders', 'inventory', 'jev_audit_logs')" },
             query: { type: Type.STRING, description: "SQL query statement" }
           },
           required: []

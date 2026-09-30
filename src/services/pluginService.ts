@@ -212,19 +212,19 @@ export const INITIAL_PLUGINS: PluginItem[] = [
     categoryLabel: 'Pangkalan Data & Analitik',
     developer: 'Supabase Inc.',
     description: 'Uruskan pangkalan data PostgreSQL ber-RLS, jalankan query SQL analitik, dan pantau rekod bukti forensik.',
-    detailedDescription: 'Integrasi terus dengan 11 jadual PostgreSQL Supabase yang menyimpan 167 snapshot bukti forensik, 131 entiti graf pengetahuan, dan pangkalan data pesanan pelanggan berpusat.',
+    detailedDescription: 'Integrasi terus dengan pangkalan data PostgreSQL Supabase (Projek: bktksvhcgszaoqkdyhil.supabase.co) untuk menyimpan rekod pesanan, audit invarian JEV, dan jadual inventori perniagaan secara masa nyata.',
     installed: true,
     enabled: true,
     requiresAuth: true,
     authType: 'api_key',
-    connectedAccount: 'sb_project_krw35 (PostgreSQL Active)',
+    connectedAccount: 'bktksvhcgszaoqkdyhil.supabase.co (Active & Live)',
     iconType: 'Database',
     accentColor: '#3ECF8E',
     capabilities: ['Jalankan query SQL SELECT / COUNT selamat', 'Semak jadual bukti forensik & snapshot', 'Pantau integriti data pesanan', 'Audit status keselamatan RLS'],
     examplePrompts: [
       'Jalankan query SQL di Supabase untuk mengira jumlah pesanan mengikut bandar',
-      'Semak jadual snapshot forensik yang mempunyai rekod LEAKAGE di Supabase',
-      'Papar 5 rekod entiti perniagaan tertinggi dalam pangkalan data Supabase'
+      'Semak status sambungan pelayan Supabase bktksvhcgszaoqkdyhil',
+      'Papar jadual skema pangkalan data Supabase Abang Colek OS'
     ],
     version: '3.3.1',
     rating: 4.9,
